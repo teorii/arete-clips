@@ -188,7 +188,10 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>Arete</h1>
+        <div className="brand">
+          <BrandMark />
+          <h1>Arete</h1>
+        </div>
         <span className="count">
           {items.length}
           {hasMore ? '+' : ''}
@@ -320,9 +323,17 @@ export default function App() {
 
       {!loading && items.length === 0 && held.length === 0 && !error ? (
         <div className="empty">
-          {search || filter === 'pinned'
-            ? 'No clips match that.'
-            : 'No clips yet. Run the capture daemon and press F9 in game.'}
+          {search || filter === 'pinned' ? (
+            <>
+              <strong>Nothing matches that</strong>
+              Try a different search, or clear the filter.
+            </>
+          ) : (
+            <>
+              <strong>No clips yet</strong>
+              Press F9 in game and the moment lands here, ready for a link.
+            </>
+          )}
         </div>
       ) : (
         <div className="grid">
@@ -382,6 +393,27 @@ export default function App() {
 
       {toast && <div className="toast">{toast}</div>}
     </div>
+  )
+}
+
+/** The app mark, the same geometry branding.py draws for the tray and the
+ *  executable: an A as an apex, with the counter and the gap between its legs
+ *  cut back out. One mark, so the window and the taskbar agree. */
+function BrandMark() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 100 100" aria-hidden="true">
+      <defs>
+        <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#f8607a" />
+          <stop offset="100%" stopColor="#ffb347" />
+        </linearGradient>
+      </defs>
+      <path
+        fill="url(#mark)"
+        fillRule="evenodd"
+        d="M50 11L94 89L6 89Z M50 37L64.8 60L35.2 60Z M35.2 72L64.8 72L73.5 89L26.5 89Z"
+      />
+    </svg>
   )
 }
 
@@ -451,7 +483,7 @@ function ClipCard({
 }) {
   const thumb = thumbnailUrl(clip)
   return (
-    <article className="card">
+    <article className={`card${clip.favorite ? ' pinned' : ''}`}>
       <button className="thumb" onClick={onOpen} aria-label={`Open ${clip.title ?? 'clip'}`}>
         {thumb ? (
           <img src={thumb} alt="" loading="lazy" />

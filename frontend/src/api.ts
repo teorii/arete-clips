@@ -90,6 +90,36 @@ export function setApiKey(key: string): void {
   }
 }
 
+/** Something a person can act on.
+ *
+ * A failing request does not always answer in JSON: a proxy, a tunnel that has
+ * expired, or a server that fell over answers in HTML, and pasting that into
+ * the page put a whole error document across the top of the library. Nothing
+ * in it told you what to do.
+ */
+function readableError(body: string, response: Response): string {
+  const trimmed = body.trim()
+
+  if (trimmed.startsWith('{')) {
+    try {
+      const parsed: unknown = JSON.parse(trimmed)
+      const detail = (parsed as { detail?: unknown }).detail
+      if (typeof detail === 'string' && detail) return detail
+    } catch {
+      /* not the JSON it looked like; fall through to the status */
+    }
+  }
+
+  if (trimmed && !trimmed.startsWith('<')) return trimmed.slice(0, 200)
+
+  if (response.status === 404) return 'The server did not recognise that address.'
+  if (response.status === 401 || response.status === 403) {
+    return 'This machine is not signed in to that library.'
+  }
+  if (response.status >= 500) return 'The server failed to answer. It may have stopped.'
+  return response.statusText || `Request failed (${response.status}).`
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const key = apiKey()
   const response = await fetch(path, {
@@ -102,7 +132,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   })
   if (!response.ok) {
     const body = await response.text().catch(() => '')
-    throw new ApiError(body.slice(0, 300) || response.statusText, response.status)
+    throw new ApiError(readableError(body, response), response.status)
   }
   return response.status === 204 ? (undefined as T) : ((await response.json()) as T)
 }
