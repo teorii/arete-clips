@@ -329,6 +329,13 @@ class CaptureService:
 
     def _run(self) -> None:
         try:
+            # Settings are cached for the life of the process, and the config
+            # file changes underneath it whenever the source, clip length or
+            # hotkey is changed. Refreshed here, next to the only place that
+            # reads them, so no caller can forget: a restart that rebuilt the
+            # capture from the values it started with looked exactly like a
+            # setting that had not been written at all.
+            capture_config()
             self.daemon = Daemon()
             self.daemon.drain_journal()
             self.daemon.start_buffer()
@@ -647,14 +654,21 @@ def main() -> int:
     # and the tray callbacks close over this rather than a stale instance.
     services = {"capture": capture}
 
-    def apply_settings() -> None:
-        """Re-read config and rebuild capture, then return to the app."""
-        old_service = services["capture"]
-        old_service.stop()
+    def restart_capture() -> None:
+        """Rebuild the capture service so it picks up the config as written.
+
+        Settings are read at construction, so a changed display or clip length
+        means a new service rather than a nudge to the running one.
+        """
+        services["capture"].stop()
         fresh = CaptureService(on_clip=on_clip_done, on_health=on_health)
         services["capture"] = fresh
         if not args.no_capture:
             fresh.start()
+
+    def apply_settings() -> None:
+        """Re-read config and rebuild capture, then return to the app."""
+        restart_capture()
         window.resize(1280, 820)
         window.load_url(app_url())
 
@@ -673,6 +687,9 @@ def main() -> int:
         # Leaving settings goes back to the library. Setup's skip abandons a
         # machine that is not configured yet, which is a different thing.
         close_settings=lambda: window.load_url(app_url()),
+        # Changing the source from the library applies where you are, rather
+        # than sending you through a settings page to change one thing.
+        restart_capture=lambda: restart_capture(),
     )
 
     if configured:

@@ -34,7 +34,25 @@ export const DEFAULT_PREFERENCES: Preferences = {
   held_warning_gb: 2,
 }
 
+/** A display, which is the only thing capture can select: it duplicates a
+ *  whole display, so there is no per-window option to offer. Named by the
+ *  client, including what is running on it, so the list reads the same in the
+ *  library and in settings. */
+export interface Source {
+  index: number
+  label: string
+  running: string[]
+}
+
+export interface Sources {
+  displays: Source[]
+  /** The display index being recorded now. */
+  current: number
+}
+
 export interface Bridge {
+  sources(): Promise<Sources>
+  set_source(display: number): Promise<{ ok: boolean; message?: string }>
   held_clips(): Promise<HeldClip[]>
   generate_link(path: string): Promise<{ ok: boolean; url?: string; message?: string }>
   discard_clip(path: string): Promise<{ ok: boolean; message?: string }>

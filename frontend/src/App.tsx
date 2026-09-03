@@ -10,7 +10,7 @@ import {
   thumbnailUrl,
   trimClip,
 } from './api'
-import { type HeldClip, getBridge, isDesktop } from './bridge'
+import { type HeldClip, type Sources, getBridge, isDesktop } from './bridge'
 import { ClipDetail } from './ClipDetail'
 import { EditableTitle } from './EditableTitle'
 import { useHeldClips } from './useHeldClips'
@@ -41,6 +41,35 @@ export default function App() {
   useEffect(() => {
     void isDesktop().then(setDesktop)
   }, [])
+
+  // Which display is being recorded. Worth having here and not only in
+  // settings: it is the one setting you change because of what is on screen
+  // right now, and walking to another page to do it loses the moment.
+  const [sources, setSources] = useState<Sources | null>(null)
+  const [source, setSource] = useState(0)
+  useEffect(() => {
+    if (!desktop) return
+    void getBridge().then((bridge) =>
+      bridge?.sources().then((found) => {
+        setSources(found)
+        setSource(found.current)
+      }),
+    )
+  }, [desktop])
+
+  const chooseSource = useCallback(
+    async (index: number) => {
+      const previous = source
+      setSource(index)
+      const bridge = await getBridge()
+      const result = await bridge?.set_source(index)
+      if (result && !result.ok) {
+        window.alert(`Could not change the source: ${result.message}`)
+        setSource(previous)
+      }
+    },
+    [source],
+  )
 
   // Held clips are hidden by a search or the pinned filter: neither can apply
   // to something the server has never seen.
@@ -199,6 +228,20 @@ export default function App() {
         <button className="ghost" onClick={refresh} title="Reload">
           &#8635;
         </button>
+        {sources && (
+          <select
+            className="source"
+            title="Which display Arete is recording"
+            value={source}
+            onChange={(e) => void chooseSource(Number(e.target.value))}
+          >
+            {sources.displays.map((display) => (
+              <option key={display.index} value={display.index}>
+                {display.label}
+              </option>
+            ))}
+          </select>
+        )}
         {desktop && (
           <button
             className="ghost"

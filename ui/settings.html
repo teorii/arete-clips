@@ -14,8 +14,8 @@
     <h2>Recording</h2>
     <label for="display">Source</label>
     <select id="display"><option>Reading&hellip;</option></select>
-    <div class="hint">Recording is per display, so a program only names the
-      display it is on.</div>
+    <div class="hint">Capture duplicates a whole display. Each is named by
+      what is running on it, so you do not have to remember which is which.</div>
 
     <label for="seconds">Clip length</label>
     <select id="seconds">
@@ -134,14 +134,18 @@
   }
 
   async function load() {
-    const [info, prefs, install] = await Promise.all([
-      window.pywebview.api.probe(),
+    const [info, prefs, install, current] = await Promise.all([
+      window.pywebview.api.sources(),
       window.pywebview.api.preferences(),
       window.pywebview.api.install_info(),
+      window.pywebview.api.current(),
     ]);
 
     const source = $('display');
     source.innerHTML = '';
+    // One entry per display, which is the only thing capture can select. Each
+    // is named by what is running on it, which is the part of a program list
+    // that was ever useful.
     for (const display of info.displays) {
       const option = document.createElement('option');
       option.value = String(display.index);
@@ -152,12 +156,12 @@
     connection = {
       mode: install.hosting ? 'solo' : 'join',
       url: install.server,
-      key: info.current.key,
+      key: current.key,
     };
-    $('display').value = String(info.current.display);
-    $('seconds').value = String(info.current.seconds);
-    $('hotkey').value = info.current.hotkey;
-    $('bitrate').value = info.current.bitrate;
+    $('display').value = String(current.display);
+    $('seconds').value = String(current.seconds);
+    $('hotkey').value = current.hotkey;
+    $('bitrate').value = current.bitrate;
 
     for (const id of CHECKS) $(id).checked = prefs[id] === true;
     $('held_warning_gb').value = String(

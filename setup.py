@@ -102,6 +102,20 @@ def write_config(values: dict[str, object]) -> Path:
     return path
 
 
+# Windows' own furniture. These are on every display and name none of them
+# usefully, so they only make the list harder to read.
+_SHELL_PROCESSES = frozenset({
+    "ApplicationFrameHost", "TextInputHost", "SystemSettings", "ShellExperienceHost",
+    "SearchHost", "StartMenuExperienceHost", "Microsoft.Notes", "RtkUWP", "explorer",
+})
+
+
+def _is_local(url: str) -> bool:
+    """Whether an address points at this machine, which is what makes an
+    install a host rather than a client of someone else's."""
+    return bool(re.search(r"localhost|127\.0\.0\.1", url))
+
+
 class AppBridge:
     """Everything the pages can call, exposed as `pywebview.api`.
 
@@ -111,10 +125,17 @@ class AppBridge:
     to reach the client, not the API.
     """
 
-    def __init__(self, uploader_factory=None, open_settings=None, close_settings=None):
+    def __init__(
+        self,
+        uploader_factory=None,
+        open_settings=None,
+        close_settings=None,
+        restart_capture=None,
+    ):
         self._uploader_factory = uploader_factory
         self._open_settings = open_settings
         self._close_settings = close_settings
+        self._restart_capture = restart_capture
 
     def close_settings(self) -> dict:
         """Leave settings without saving. Not the same as skipping setup."""
@@ -215,8 +236,11 @@ class SetupApi(AppBridge):
         uploader_factory=None,
         open_settings=None,
         close_settings=None,
+        restart_capture=None,
     ):
-        super().__init__(uploader_factory, open_settings, close_settings)
+        super().__init__(
+            uploader_factory, open_settings, close_settings, restart_capture
+        )
         self._on_saved = on_saved
         self._on_skipped = on_skipped
         self.saved = False
@@ -256,6 +280,76 @@ class SetupApi(AppBridge):
             "bitrate": settings.capture_bitrate,
         }
 
+    def sources(self) -> dict:
+        """What can be recorded, without the hardware check.
+
+        probe() also asks whether the encoder works, which spawns ffmpeg. That
+        is worth doing once during setup and not every time a dropdown opens.
+        """
+        from capture.probe import list_displays
+        from capture.windows import visible_windows
+
+        try:
+            programs = visible_windows()
+        except OSError as exc:
+            warn("visible windows", exc, "only displays will be offered")
+            programs = []
+        on_display: dict[int, list[str]] = {}
+        for program in programs:
+            name = program["process"].removesuffix(".exe")
+            if name in _SHELL_PROCESSES:
+                continue
+            names = on_display.setdefault(program["display_index"], [])
+            if name not in names:
+                names.append(name)
+
+        # One entry per display, because that is what capture can actually
+        # select. Offering programs as well implied it could record a single
+        # window, and several of them mapped to the same display, so choosing
+        # one showed another. What was useful about them, knowing which monitor
+        # the game is on, is kept here as part of the name.
+        entries = []
+        for display in list_displays():
+            label = (
+                f"Display {display['index'] + 1} "
+                f"({display['width']}x{display['height']})"
+            )
+            running = on_display.get(display["index"], [])
+            if running:
+                shown = ", ".join(running[:3])
+                if len(running) > 3:
+                    shown += f" +{len(running) - 3}"
+                label += f" - {shown}"
+            entries.append({**display, "label": label, "running": running})
+
+        return {"displays": entries, "current": self.current()["display"]}
+
+    def set_source(self, display: int) -> dict:
+        """Record a different display, without leaving the library to do it.
+
+        Everything else in the config is carried through: this is one setting,
+        not a save of the whole settings page.
+        """
+        now = self.current()
+        try:
+            write_config(
+                {
+                    "mode": "solo" if _is_local(now["url"]) else "join",
+                    "url": now["url"],
+                    "key": now["key"],
+                    "display": int(display),
+                    "seconds": now["seconds"],
+                    "hotkey": now["hotkey"],
+                }
+            )
+        except (OSError, ValueError) as exc:
+            warn("set source", exc, "the source was not changed")
+            return {"ok": False, "message": str(exc)}
+
+        if self._restart_capture is not None:
+            self._restart_capture()
+        return {"ok": True, "display": int(display)}
+
     def install_info(self) -> dict:
         """What this install is, for a screen that is not asking to change it.
 
@@ -269,7 +363,7 @@ class SetupApi(AppBridge):
         get_settings.cache_clear()
         settings = get_settings()
         now = self.current()
-        hosting = bool(re.search(r"localhost|127\.0\.0\.1", now["url"]))
+        hosting = _is_local(now["url"])
         return {
             "hosting": hosting,
             "server": now["url"],

@@ -43,6 +43,12 @@ def test_settings_is_its_own_page_not_the_setup_one():
     for control in ("hotkey", "seconds", "bitrate", "display"):
         assert f'id="{control}"' in markup, f"settings cannot change {control}"
 
+    # Capture selects a display, so that is the only thing the page offers.
+    # Programs were offered alongside them once, which implied a single window
+    # could be recorded and made several options mean the same display.
+    assert "info.displays" in markup
+    assert "programs" not in markup, "a program is not something capture can select"
+
 
 def test_closing_settings_is_not_skipping_setup():
     closed = []
@@ -69,3 +75,62 @@ def test_quality_is_only_written_when_the_page_offers_it(tmp_path, monkeypatch):
 
     setup_module.write_config({**base, "bitrate": "6M"})
     assert "CAPTURE_BITRATE=6M" in config.read_text(encoding="utf-8")
+
+
+def test_sources_are_labelled_for_the_pages_that_show_them(monkeypatch):
+    """The settings page rendered an empty dropdown because it invented its own
+    label from a field the probe does not return. One name, built here."""
+    import setup as setup_module
+
+    monkeypatch.setattr(
+        "capture.probe.list_displays",
+        lambda: [{"index": 0, "width": 1920, "height": 1080},
+                 {"index": 1, "width": 2560, "height": 1440}],
+    )
+    monkeypatch.setattr(
+        "capture.windows.visible_windows",
+        lambda: [{"process": "League.exe", "display_index": 1,
+                  "title": "League", "width": 2560, "height": 1440}],
+    )
+
+    api = setup_module.SetupApi(on_saved=lambda: None, on_skipped=lambda: None)
+    found = api.sources()
+
+    # One entry per display, named by what is on it: a program list alongside
+    # implied capture could select a window, and it cannot.
+    assert "programs" not in found
+    assert found["displays"][0]["label"] == "Display 1 (1920x1080)"
+    assert found["displays"][1]["label"] == "Display 2 (2560x1440) - League"
+    for entry in found["displays"]:
+        assert entry["label"].strip(), "an unlabelled entry renders as a blank row"
+
+
+def test_changing_the_source_keeps_every_other_setting(tmp_path, monkeypatch):
+    """Changing one thing from the library must not rewrite the rest of the
+    config as a side effect."""
+    import setup as setup_module
+
+    config = tmp_path / "config.env"
+    config.write_text(
+        "API_BASE_URL=http://localhost:8000\nARETE_API_KEY=\n"
+        "DDAGRAB_OUTPUT_IDX=0\nCLIP_SECONDS=90\nHOTKEY_VK=0x7A\n"
+        "CAPTURE_BITRATE=20M\nSETUP_COMPLETE=1\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(setup_module, "config_file", lambda: config)
+
+    restarted = []
+    api = setup_module.SetupApi(
+        on_saved=lambda: None,
+        on_skipped=lambda: None,
+        restart_capture=lambda: restarted.append(True),
+    )
+
+    assert api.set_source(2) == {"ok": True, "display": 2}
+    assert restarted == [True], "capture reads its display at construction"
+
+    written = config.read_text(encoding="utf-8")
+    assert "DDAGRAB_OUTPUT_IDX=2" in written
+    assert "CLIP_SECONDS=90" in written
+    assert "HOTKEY_VK=0x7A" in written
+    assert "CAPTURE_BITRATE=20M" in written

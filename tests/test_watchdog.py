@@ -135,3 +135,49 @@ def test_restarting_a_wedged_encoder_kills_it_first():
     run_watchdog(service, 0.3)
 
     assert ring.stops >= 1, "wedged process was never killed before restart"
+
+
+def test_a_restarted_capture_rereads_the_config_first(monkeypatch):
+    """Settings are cached for the life of the process. A restart that built
+    the capture from the values it started with looked exactly like a source
+    change that had not been written: the config said display 2, the encoder
+    carried on with display 0."""
+    import desktop
+
+    order: list[str] = []
+
+    def reread():
+        order.append("reread")
+
+    class Boom:
+        def __init__(self):
+            order.append("daemon")
+            raise RuntimeError("far enough")
+
+    monkeypatch.setattr(desktop, "capture_config", reread)
+    monkeypatch.setattr(desktop, "Daemon", Boom)
+
+    service = CaptureService()
+    service._run()
+
+    assert order == ["reread", "daemon"], "the daemon read settings nobody refreshed"
+    assert "far enough" in (service.error or "")
+
+
+def test_the_config_is_reread_from_disk_not_from_the_cache(tmp_path, monkeypatch):
+    import desktop
+    from capture.config import CaptureSettings, get_capture_settings
+
+    monkeypatch.delenv("DDAGRAB_OUTPUT_IDX", raising=False)
+    config = tmp_path / "config.env"
+    config.write_text("DDAGRAB_OUTPUT_IDX=0\n", encoding="utf-8")
+    monkeypatch.setattr(desktop, "config_file", lambda: config)
+    original = CaptureSettings.model_config["env_file"]
+    try:
+        assert desktop.capture_config().ddagrab_output_idx == 0
+
+        config.write_text("DDAGRAB_OUTPUT_IDX=2\n", encoding="utf-8")
+        assert desktop.capture_config().ddagrab_output_idx == 2
+    finally:
+        CaptureSettings.model_config["env_file"] = original
+        get_capture_settings.cache_clear()
