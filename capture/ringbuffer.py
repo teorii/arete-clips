@@ -17,8 +17,10 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
+from .audio import find_loopback_device
 from .config import CaptureSettings
 from .ffmpeg import FFMPEG
 
@@ -30,16 +32,42 @@ class RingBuffer:
         self.log_path = self.dir / "ffmpeg.log"
         self.proc: subprocess.Popen | None = None
         self._log = None
+        self.audio_device: str | None = None
+        self._audio_resolved = False
 
     # ------------------------------------------------------------- lifecycle
+
+    def resolve_audio(self) -> str | None:
+        """Look for a desktop-audio device once and remember the answer.
+
+        Enumerating dshow devices spawns a process, so this must not happen on
+        every restart the watchdog performs.
+        """
+        if not self._audio_resolved:
+            self.audio_device = find_loopback_device(self.s.audio_device)
+            self._audio_resolved = True
+        return self.audio_device
 
     def command(self) -> list[str]:
         s = self.s
         gop = s.segment_seconds * s.capture_fps
-        return [
+        audio = self.resolve_audio()
+
+        args = [
             FFMPEG, "-hide_banner", "-loglevel", "warning", "-nostdin",
             "-f", "lavfi",
             "-i", f"ddagrab=output_idx={s.ddagrab_output_idx}:framerate={s.capture_fps}",
+        ]
+        if audio:
+            # A generous queue: the audio device and the screen do not produce
+            # at the same cadence, and a full queue shows up as dropped sound.
+            args += [
+                "-thread_queue_size", "1024",
+                "-f", "dshow",
+                "-i", f"audio={audio}",
+                "-map", "0:v", "-map", "1:a",
+            ]
+        args += [
             "-c:v", "h264_nvenc",
             # p4 is the balanced NVENC preset; low-latency tuning keeps the
             # encoder from buffering frames it would need to hold onto.
@@ -51,6 +79,10 @@ class RingBuffer:
             # This is also what makes the cut a byte copy instead of a re-encode.
             "-g", str(gop), "-forced-idr", "1",
             "-force_key_frames", f"expr:gte(t,n_forced*{s.segment_seconds})",
+        ]
+        if audio:
+            args += ["-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2"]
+        args += [
             "-f", "segment",
             "-segment_time", str(s.segment_seconds),
             "-segment_wrap", str(s.segment_count),
@@ -58,6 +90,7 @@ class RingBuffer:
             "-reset_timestamps", "1",
             str(self.dir / "seg%03d.ts"),
         ]
+        return args
 
     def start(self) -> None:
         if self.is_running():
@@ -76,6 +109,27 @@ class RingBuffer:
 
     def is_running(self) -> bool:
         return self.proc is not None and self.proc.poll() is None
+
+    def seconds_since_last_write(self) -> float | None:
+        """Age of the newest segment, or None when the ring is empty."""
+        try:
+            newest = max(
+                (p.stat().st_mtime for p in self.dir.glob("*.ts")), default=None
+            )
+        except OSError:
+            return None
+        return None if newest is None else max(0.0, time.time() - newest)
+
+    def is_stalled(self, tolerance_seconds: float) -> bool:
+        """True when the process is alive but has stopped producing.
+
+        A dead process is easy to spot. A wedged one is not: a GPU driver reset
+        can leave ffmpeg running and writing nothing, which every liveness check
+        reads as healthy right up until you press the hotkey and get an empty
+        buffer. Segments arrive continuously, so silence is the real signal.
+        """
+        age = self.seconds_since_last_write()
+        return age is not None and age > tolerance_seconds
 
     def stop(self) -> None:
         if self.proc is not None and self.proc.poll() is None:

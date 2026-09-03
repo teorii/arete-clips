@@ -15,6 +15,10 @@ class CaptureSettings(BaseSettings):
     buffer_seconds: int = 60
     segment_seconds: int = 2
 
+    # "auto" finds a loopback device, "none" records silent video, anything
+    # else is an exact dshow device name.
+    audio_device: str = "auto"
+
     capture_fps: int = 60
     capture_bitrate: str = "12M"
     # Which desktop output the Desktop Duplication API should grab.

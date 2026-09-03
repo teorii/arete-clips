@@ -59,7 +59,7 @@ result for dedup, extracting a poster frame) rather than by the remux itself.
 | Path | What it is |
 |---|---|
 | `capture/ringbuffer.py` | The rolling NVENC buffer. `-segment_wrap` makes the directory a self-overwriting ring. |
-| `capture/clipper.py` | Snapshot the newest segments, concat, remux to MP4, make a poster frame. |
+| `capture/cutter.py` | Snapshot the newest segments, concat, remux to MP4, make a poster frame. |
 | `capture/uploader.py` | Three-step upload against the presigned-URL contract, journalled to disk for crash recovery. |
 | `capture/hotkey.py` | Global hotkey via `RegisterHotKey`, deliberately not a low-level keyboard hook. |
 | `capture/daemon.py` | Ties it together. Entry point. |
@@ -181,9 +181,13 @@ contract, and it is the only place bytes pass through the app tier.
 
 ## What is deliberately not built yet
 
-- **Audio.** `ddagrab` is video-only. Windows loopback capture needs a virtual
-  audio device, and separate game/mic/voice tracks (free at capture time,
-  irreversible if skipped) are the version worth building.
+- **Audio needs a loopback device.** Windows ships none, so `ddagrab` alone
+  records silent video. Install
+  [screen-capture-recorder](https://github.com/rdp/screen-capture-recorder-to-video-windows-free/releases)
+  and its `virtual-audio-capturer` device is picked up automatically, no
+  configuration. `AUDIO_DEVICE` in `.env` overrides the search: `none` forces
+  silent video, or name an exact dshow device. Mic and voice chat on separate
+  tracks are still unbuilt.
 - **Byte-range resumable upload.** Retry is per-clip via the journal, so a crash
   or reboot does not lose a clip, but a 90%-complete upload restarts. The API is
   already shaped around upload targets so multipart drops in.

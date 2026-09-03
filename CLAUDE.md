@@ -80,7 +80,7 @@ branding.py The name, colours and app mark. One source for every surface.
 tools/      make_icon.py renders the mark, make_launcher.py builds Arete.exe
 assets/     arete.ico, the icon Windows reads for taskbar and Task Manager
 server/     FastAPI. main.py routes, models.py schema, storage.py backends
-capture/    Windows client. ringbuffer.py -> clipper.py -> uploader.py
+capture/    Windows client. ringbuffer.py -> cutter.py -> uploader.py
 frontend/   React + Vite clip manager, served at /app
 sql/        Canonical Postgres DDL for the Supabase swap
 docs/design/  The system design this implements
@@ -88,7 +88,7 @@ docs/design/  The system design this implements
 
 ## Request lifecycle
 
-`capture.daemon` F9 -> `clipper.flush` (snapshot segments, concat, remux) ->
+`capture.daemon` F9 -> `cutter.flush` (snapshot segments, concat, remux) ->
 `uploader.submit` -> `POST /api/clips` (row + presigned target) -> PUT bytes to
 storage -> `POST /api/clips/{id}/complete` (server verifies size against
 storage, flips status to `ready`) -> `GET /c/{slug}`.

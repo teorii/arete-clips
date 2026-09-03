@@ -14,19 +14,26 @@ from desktop import CaptureService
 
 
 class FakeRing:
-    def __init__(self, alive: bool = True, revives: bool = True):
+    def __init__(self, alive: bool = True, revives: bool = True, stalled: bool = False):
         self.alive = alive
         self.revives = revives
+        self.stalled = stalled
         self.starts = 0
+        self.stops = 0
 
     def is_running(self) -> bool:
         return self.alive
 
+    def is_stalled(self, _tolerance: float) -> bool:
+        return self.stalled
+
     def start(self) -> None:
         self.starts += 1
         self.alive = self.revives
+        self.stalled = False
 
     def stop(self) -> None:
+        self.stops += 1
         self.alive = False
 
 
@@ -107,3 +114,24 @@ def test_shutdown_stops_the_watchdog_rather_than_restarting():
 
     assert not thread.is_alive(), "watchdog ignored the stop signal"
     assert ring.starts == 0
+
+
+def test_a_wedged_encoder_is_treated_as_dead():
+    """The case a liveness check misses: ffmpeg still running, producing
+    nothing. Left alone the app looks healthy until the buffer comes up empty."""
+    ring = FakeRing(alive=True, stalled=True)
+    service, events = make_service(ring)
+    run_watchdog(service, 0.3)
+
+    assert ring.starts >= 1, "a stalled buffer was never restarted"
+    assert any("stalled" in msg.lower() for _, msg in events)
+
+
+def test_restarting_a_wedged_encoder_kills_it_first():
+    """start() declines to act while the process is alive, so without the stop
+    the restart would be a no-op and capture would stay dead."""
+    ring = FakeRing(alive=True, stalled=True)
+    service, _ = make_service(ring)
+    run_watchdog(service, 0.3)
+
+    assert ring.stops >= 1, "wedged process was never killed before restart"

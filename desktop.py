@@ -175,6 +175,9 @@ class CaptureService:
     # them instead of sleeping through real intervals.
     poll_seconds = 3.0
     settle_seconds = 2.5
+    # Segments land every couple of seconds, so silence for several times that
+    # means production has stopped even if the process is still alive.
+    stall_seconds = 8.0
 
     def __init__(
         self,
@@ -230,21 +233,30 @@ class CaptureService:
         """
         failures = 0
         while not self._stopping.wait(self.poll_seconds):
-            if self.daemon is None or self.daemon.ring.is_running():
+            if self.daemon is None:
+                continue
+            ring = self.daemon.ring
+            alive = ring.is_running()
+            stalled = alive and ring.is_stalled(self.stall_seconds)
+            if alive and not stalled:
                 failures = 0
                 continue
 
             failures += 1
-            self._health(False, "Recording stopped. Restarting.")
+            reason = "stalled" if stalled else "stopped"
+            self._health(False, f"Recording {reason}. Restarting.")
             try:
-                self.daemon.ring.start()
+                # A wedged process has to be killed before it can be replaced;
+                # start() alone would see it alive and decline to do anything.
+                ring.stop()
+                ring.start()
             except OSError as exc:
                 print(f"[capture] restart failed: {exc}")
 
             # Give ffmpeg a moment to either come up or fall over again.
             if self._stopping.wait(self.settle_seconds):
                 return
-            if self.daemon.ring.is_running():
+            if ring.is_running():
                 self._health(True, "Recording resumed. Buffer history was lost.")
                 failures = 0
             elif failures >= 3:

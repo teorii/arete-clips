@@ -17,7 +17,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .clipper import ClipError, flush
+from .cutter import ClipError, flush
 from .config import get_capture_settings
 from .ffmpeg import FFMPEG
 from .ringbuffer import RingBuffer
@@ -80,6 +80,7 @@ class Daemon:
             "encoder": "h264_nvenc",
             "gpu": self.gpu,
             "capture_api": "ddagrab (Desktop Duplication)",
+            "audio": self.ring.audio_device or "none",
             "width": width,
             "height": height,
             "fps": self.s.capture_fps,
@@ -133,9 +134,20 @@ class Daemon:
             raise SystemExit(
                 f"capture process exited immediately.\n{self.ring.tail_log()}"
             )
+        audio = self.ring.audio_device
         print(f"Capturing on {self.gpu} via h264_nvenc")
+        if audio:
+            print(f"Desktop audio: {audio}")
+        else:
+            print(
+                "Desktop audio: none found, clips will be silent. "
+                "Install a loopback capture device, or set AUDIO_DEVICE."
+            )
 
     def drain_journal(self) -> None:
+        swept = self.uploader.sweep_staging(CLIP_OUT_DIR)
+        if swept:
+            print(f"Cleared {swept} already-uploaded staging file(s)")
         outstanding = self.uploader.pending_count()
         if outstanding:
             print(f"Retrying {outstanding} clip(s) left over from a previous run...")

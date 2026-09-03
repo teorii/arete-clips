@@ -20,7 +20,7 @@ from pathlib import Path
 
 import httpx
 
-from .clipper import ClipResult
+from .cutter import ClipResult
 
 
 @dataclass
@@ -143,7 +143,50 @@ class Uploader:
             )
 
         self._dequeue(pending.mp4_path)
+        # The bytes are in object storage now, so the staging copy is a second
+        # full-size copy of every clip. Without this the disk grows by roughly
+        # 44 MB per clip forever, and deleting a clip in the library frees only
+        # half of it.
+        self._discard_local(mp4, thumb)
         return created["shareUrl"]
+
+    @staticmethod
+    def _discard_local(*paths: Path | None) -> None:
+        for path in paths:
+            if path is None:
+                continue
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass  # a locked file is not worth failing a finished upload
+
+    def sweep_staging(self, directory: Path) -> int:
+        """Delete staging files no longer waiting to be uploaded.
+
+        Anything in the staging directory that the journal does not know about
+        has either already been uploaded or was orphaned by a crash. Safe to run
+        at start-up, when nothing is in flight, and it clears leftovers from
+        before uploads started cleaning up after themselves.
+        """
+        directory = Path(directory)
+        if not directory.is_dir():
+            return 0
+        keep = {
+            Path(entry[key]).resolve()
+            for entry in self._load()
+            for key in ("mp4_path", "thumb_path")
+            if entry.get(key)
+        }
+        removed = 0
+        for path in list(directory.glob("*.mp4")) + list(directory.glob("*.jpg")):
+            if path.resolve() in keep:
+                continue
+            try:
+                path.unlink()
+                removed += 1
+            except OSError:
+                pass
+        return removed
 
     # ------------------------------------------------------------- plumbing
 
