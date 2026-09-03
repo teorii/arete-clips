@@ -151,13 +151,15 @@
         'used.</div>';
 
     // Registering the hotkey is not the same as being given it: Windows will
-    // not deliver one to a process of lower integrity than the window in front.
+    // not deliver one to a process of lower integrity than the window in
+    // front. Stated, not solved. The obvious workaround is to elevate this
+    // app so it sits alongside an anti-cheat, which is not something worth
+    // recommending to anyone, and did not work when it was tried.
     const rights = install.elevated
       ? ''
-      : '<div class="check"><b>Hotkey</b> <span class="bad">Will not reach ' +
-        'games that run as administrator.</span></div>' +
-        '<div class="hint">League does, through Vanguard. Close Arete, ' +
-        'right-click it and choose Run as administrator.</div>';
+      : '<div class="check"><b>Hotkey</b> <span>Some games do not pass the ' +
+        'key through to other applications, so it may do nothing while one ' +
+        'is in front.</span></div>';
 
     let html =
       '<div class="check"><b>Clips</b> <span>' + where + '</span></div>' +

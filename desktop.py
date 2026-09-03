@@ -351,11 +351,16 @@ class CaptureService:
                 name = _KEY_NAMES.get(key, f"vk {key:#04x}")
                 print(f"Hotkey armed: {name} clips the last {self.daemon.s.clip_seconds}s")
                 if not running_elevated():
-                    # Registering the key is not the same as being given it.
+                    # Registering the key is not the same as being given it:
+                    # Windows will not deliver one to a process of lower
+                    # integrity than the window in front. Said plainly, and
+                    # without recommending anything: telling people to elevate
+                    # an executable so it can sit under an anti-cheat is not
+                    # advice worth giving, and it did not work when tried.
                     print(
-                        "  Note: Arete is not running as administrator, so this "
-                        "key will not reach it while a game that is stays in "
-                        "front. League does, through Vanguard."
+                        "  Note: some games do not pass this key through to "
+                        "other applications, so it may do nothing while one "
+                        "is in front."
                     )
 
             pump(self.daemon.s.hotkey_vk, self._on_hotkey, on_ready=armed)

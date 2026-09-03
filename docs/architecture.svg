@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 520" width="1000" height="520" font-family="ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif">
+  <defs>
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8607a"/>
+      <stop offset="100%" stop-color="#ffb347"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7c6f6f"/>
+    </marker>
+    <marker id="arrowWarm" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#ff8f5e"/>
+    </marker>
+  </defs>
+
+  <rect width="1000" height="520" fill="#0c0a0c"/>
+
+  <text x="16" y="30" fill="#f2ece9" font-size="16" font-weight="600">Arete</text>
+  <text x="68" y="30" fill="#7c6f6f" font-size="12.5">press F9, get a link to the last 30 seconds</text>
+
+  <rect x="16" y="46" width="600" height="392" rx="12" fill="#141017" stroke="#2a2228"/>
+  <text x="32" y="68" fill="#7c6f6f" font-size="10.5" letter-spacing="1.3">ON THE PLAYER'S MACHINE</text>
+
+  <rect x="632" y="46" width="352" height="392" rx="12" fill="#141017" stroke="#2a2228"/>
+  <text x="648" y="68" fill="#7c6f6f" font-size="10.5" letter-spacing="1.3">REACHABLE BY A LINK</text>
+
+  <rect x="34" y="84" width="124" height="50" rx="9" fill="#1a1418" stroke="#3d3238"/>
+  <text x="96" y="106" fill="#f2ece9" font-size="12" text-anchor="middle">Game renders</text>
+  <text x="96" y="122" fill="#7c6f6f" font-size="10.5" text-anchor="middle">1440p, 60 fps</text>
+
+  <rect x="186" y="84" width="142" height="50" rx="9" fill="#1a1418" stroke="#3d3238"/>
+  <text x="257" y="106" fill="#f2ece9" font-size="12" text-anchor="middle">ddagrab</text>
+  <text x="257" y="122" fill="#7c6f6f" font-size="10.5" text-anchor="middle">Desktop Duplication</text>
+
+  <rect x="356" y="84" width="132" height="50" rx="9" fill="#1a1418" stroke="url(#brand)" stroke-width="1.5"/>
+  <text x="422" y="106" fill="#f2ece9" font-size="12" text-anchor="middle">h264_nvenc</text>
+  <text x="422" y="122" fill="#7c6f6f" font-size="10.5" text-anchor="middle">on the GPU</text>
+
+  <line x1="158" y1="109" x2="182" y2="109" stroke="#7c6f6f" stroke-width="1.4" marker-end="url(#arrow)"/>
+  <line x1="328" y1="109" x2="352" y2="109" stroke="#ff8f5e" stroke-width="1.6" marker-end="url(#arrowWarm)"/>
+  <text x="340" y="78" fill="#ff8f5e" font-size="10" text-anchor="middle">D3D11 frame</text>
+
+  <rect x="34" y="208" width="206" height="50" rx="9" fill="#1a1418" stroke="#3d3238"/>
+  <text x="137" y="230" fill="#f2ece9" font-size="12" text-anchor="middle">WASAPI loopback</text>
+  <text x="137" y="246" fill="#7c6f6f" font-size="10.5" text-anchor="middle">the default playback device</text>
+
+  <path d="M240 233 L340 233 L340 109 L352 109" fill="none" stroke="#ff8f5e" stroke-width="1.6" marker-end="url(#arrowWarm)"/>
+  <text x="137" y="276" fill="#ff8f5e" font-size="10" text-anchor="middle">raw samples on the encoder's stdin</text>
+  <text x="137" y="289" fill="#7c6f6f" font-size="10" text-anchor="middle">one clock for both, so they cannot drift</text>
+
+  <rect x="356" y="208" width="132" height="50" rx="9" fill="#1a1418" stroke="#3d3238"/>
+  <text x="422" y="230" fill="#f2ece9" font-size="12" text-anchor="middle">Ring buffer</text>
+  <text x="422" y="246" fill="#7c6f6f" font-size="10.5" text-anchor="middle">60s, 2s segments</text>
+  <line x1="422" y1="138" x2="422" y2="204" stroke="#7c6f6f" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+  <rect x="186" y="298" width="142" height="56" rx="9" fill="#1a1418" stroke="url(#brand)" stroke-width="1.5"/>
+  <text x="257" y="325" fill="#f2ece9" font-size="12.5" text-anchor="middle" font-weight="600">F9</text>
+  <text x="257" y="342" fill="#7c6f6f" font-size="10.5" text-anchor="middle">keeps the moment</text>
+
+  <rect x="356" y="298" width="132" height="56" rx="9" fill="#1a1418" stroke="#3d3238"/>
+  <text x="422" y="320" fill="#f2ece9" font-size="12" text-anchor="middle">Cut</text>
+  <text x="422" y="335" fill="#7c6f6f" font-size="10.5" text-anchor="middle">concat, remux</text>
+  <text x="422" y="349" fill="#ffb347" font-size="10" text-anchor="middle">-c copy</text>
+  <line x1="328" y1="326" x2="352" y2="326" stroke="#ff8f5e" stroke-width="1.6" marker-end="url(#arrowWarm)"/>
+  <line x1="422" y1="262" x2="422" y2="294" stroke="#7c6f6f" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+  <rect x="34" y="374" width="454" height="44" rx="9" fill="#17121a" stroke="#2a2228"/>
+  <text x="48" y="392" fill="#f2ece9" font-size="11" font-weight="600">Held on disk. Nothing has been uploaded.</text>
+  <text x="48" y="408" fill="#a89a99" font-size="10.5">Watch it, then press Generate link. Clips you never share never leave the machine.</text>
+  <line x1="422" y1="358" x2="422" y2="370" stroke="#7c6f6f" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+  <rect x="650" y="84" width="316" height="50" rx="9" fill="#1a1418" stroke="#3d3238"/>
+  <text x="808" y="106" fill="#f2ece9" font-size="12" text-anchor="middle">POST /api/clips</text>
+  <text x="808" y="122" fill="#7c6f6f" font-size="10.5" text-anchor="middle">row created, upload target returned</text>
+
+  <rect x="650" y="160" width="316" height="50" rx="9" fill="#1a1418" stroke="url(#brand)" stroke-width="1.5"/>
+  <text x="808" y="182" fill="#f2ece9" font-size="12" text-anchor="middle">PUT the bytes to storage</text>
+  <text x="808" y="198" fill="#ffb347" font-size="10.5" text-anchor="middle">direct, never through the API</text>
+  <line x1="808" y1="138" x2="808" y2="156" stroke="#7c6f6f" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+  <rect x="650" y="236" width="316" height="50" rx="9" fill="#1a1418" stroke="#3d3238"/>
+  <text x="808" y="258" fill="#f2ece9" font-size="12" text-anchor="middle">POST /complete</text>
+  <text x="808" y="274" fill="#7c6f6f" font-size="10.5" text-anchor="middle">size verified, status set to ready</text>
+  <line x1="808" y1="214" x2="808" y2="232" stroke="#7c6f6f" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+  <rect x="650" y="312" width="316" height="50" rx="9" fill="#1a1418" stroke="#3d3238"/>
+  <text x="808" y="334" fill="#f2ece9" font-size="12" text-anchor="middle">GET /c/&lt;slug&gt;</text>
+  <text x="808" y="350" fill="#7c6f6f" font-size="10.5" text-anchor="middle">a page anyone with the link can watch</text>
+  <line x1="808" y1="290" x2="808" y2="308" stroke="#7c6f6f" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+  <path d="M488 396 L568 396 L568 109 L646 109" fill="none" stroke="#ff8f5e" stroke-width="1.6" marker-end="url(#arrowWarm)"/>
+  <text x="568" y="414" fill="#ff8f5e" font-size="10" text-anchor="middle">Generate link</text>
+
+  <rect x="650" y="382" width="316" height="40" rx="9" fill="#17121a" stroke="#2a2228"/>
+  <text x="808" y="399" fill="#a89a99" font-size="10.5" text-anchor="middle">SQLite and the clip files sit beside the app,</text>
+  <text x="808" y="414" fill="#a89a99" font-size="10.5" text-anchor="middle">reachable through a tunnel it opens itself.</text>
+
+  <text x="16" y="462" fill="#ffb347" font-size="10.5" font-weight="600">The frame never leaves video memory.</text>
+  <text x="232" y="462" fill="#7c6f6f" font-size="10.5">Copying it to RAM would be ~900 MB/s across PCIe. Compressed, it is ~1.5 MB/s.</text>
+  <text x="16" y="482" fill="#7c6f6f" font-size="10.5">Every segment opens on an IDR frame, so a cut is a byte copy: no decode, no re-encode, and the moment is kept in about a second.</text>
+</svg>
