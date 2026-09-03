@@ -10,11 +10,15 @@ from setup import AppBridge
 def test_the_bridge_can_open_settings():
     """The tray menu is not somewhere anyone finds a setting: Windows files new
     tray icons under the overflow chevron, so the window needs a way in too."""
-    opened = []
-    api = AppBridge(open_settings=lambda: opened.append(True))
+    import threading as _threading
+
+    opened = _threading.Event()
+    api = AppBridge(open_settings=opened.set)
 
     assert api.open_settings() == {"ok": True}
-    assert opened == [True]
+    # Deferred, so the call can answer before the window navigates away from
+    # the page waiting on it.
+    assert opened.wait(timeout=3)
 
 
 def test_opening_settings_without_a_shell_says_so():
@@ -51,11 +55,13 @@ def test_settings_is_its_own_page_not_the_setup_one():
 
 
 def test_closing_settings_is_not_skipping_setup():
-    closed = []
-    api = AppBridge(close_settings=lambda: closed.append(True))
+    import threading as _threading
+
+    closed = _threading.Event()
+    api = AppBridge(close_settings=closed.set)
 
     assert api.close_settings() == {"ok": True}
-    assert closed == [True]
+    assert closed.wait(timeout=3)
 
 
 def test_quality_is_only_written_when_the_page_offers_it(tmp_path, monkeypatch):
@@ -134,3 +140,41 @@ def test_changing_the_source_keeps_every_other_setting(tmp_path, monkeypatch):
     assert "CLIP_SECONDS=90" in written
     assert "HOTKEY_VK=0x7A" in written
     assert "CAPTURE_BITRATE=20M" in written
+
+
+def test_navigation_waits_until_the_call_has_answered():
+    """pywebview resolves an api call by evaluating JavaScript that looks up a
+    callback the page registered. Navigating from inside the call throws that
+    registry away, the resolve lands on a page that has never heard of it, and
+    the bridge is wedged for every call after it:
+
+        TypeError: window.pywebview._returnValuesCallbacks.save... is not a
+        function
+
+    Saving settings did this, which is why generating a link stopped working
+    once you had opened the settings screen.
+    """
+    import threading as _threading
+
+    navigated = _threading.Event()
+    api = AppBridge(close_settings=navigated.set)
+
+    result = api.close_settings()
+
+    assert result == {"ok": True}
+    assert not navigated.is_set(), "navigated before the call could answer"
+    assert navigated.wait(timeout=3), "navigation never happened"
+
+
+def test_a_failed_navigation_is_reported_not_swallowed(capsys):
+    def explode() -> None:
+        raise RuntimeError("window is gone")
+
+    api = AppBridge(close_settings=explode)
+    api.close_settings()
+
+    import time
+
+    time.sleep(0.5)
+    # problems.warn reports on stdout, which is where the app's log picks it up.
+    assert "window is gone" in capsys.readouterr().out

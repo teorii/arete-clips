@@ -120,8 +120,20 @@
     const where = install.hosting
       ? 'This machine hosts its own clips.'
       : 'Clips go to ' + install.server + '.';
+    // Windows ships no desktop-audio capture device, so silence is the
+    // default and worth stating plainly rather than discovering on playback.
+    const audio = install.audio
+      ? '<div class="check"><b>Audio</b> <span>Recording desktop sound from ' +
+        '<code>' + install.audio + '</code></span></div>'
+      : '<div class="check"><b>Audio</b> <span class="bad">Clips will be ' +
+        'silent.</span></div>' +
+        '<div class="hint">Windows ships no desktop-audio capture device. Enable ' +
+        'Stereo Mix under Sound settings, Recording devices, then restart Arete. ' +
+        'Microphones are never used: only a device that captures what you hear.</div>';
+
     let html =
       '<div class="check"><b>Clips</b> <span>' + where + '</span></div>' +
+      audio +
       '<div class="check"><b>Folder</b> <code>' + install.folder + '</code></div>';
     if (install.invite) {
       html +=

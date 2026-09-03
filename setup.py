@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import re
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
@@ -110,6 +111,30 @@ _SHELL_PROCESSES = frozenset({
 })
 
 
+def _later(action: Callable[[], None]) -> None:
+    """Run something that navigates the window, after this call has answered.
+
+    pywebview resolves an api call by evaluating JavaScript that looks up a
+    callback the page registered. Navigating from inside the call throws that
+    registry away, so the resolve lands on a page that has never heard of it:
+
+        TypeError: window.pywebview._returnValuesCallbacks.save... is not
+        a function
+
+    The call then never settles, and the bridge is wedged for everything after
+    it. Saving settings did exactly this, which is why generating a link stopped
+    working once you had visited the settings screen.
+    """
+
+    def run() -> None:
+        try:
+            action()
+        except Exception as exc:  # noqa: BLE001
+            warn("navigation", exc, "the window stayed where it was")
+
+    threading.Timer(0.15, run).start()
+
+
 def _is_local(url: str) -> bool:
     """Whether an address points at this machine, which is what makes an
     install a host rather than a client of someone else's."""
@@ -141,7 +166,7 @@ class AppBridge:
         """Leave settings without saving. Not the same as skipping setup."""
         if self._close_settings is None:
             return {"ok": False, "message": "nothing to return to"}
-        self._close_settings()
+        _later(self._close_settings)
         return {"ok": True}
 
     def open_settings(self) -> dict:
@@ -153,7 +178,7 @@ class AppBridge:
         """
         if self._open_settings is None:
             return {"ok": False, "message": "settings are not available here"}
-        self._open_settings()
+        _later(self._open_settings)
         return {"ok": True}
 
     def _uploader(self):
@@ -357,6 +382,8 @@ class SetupApi(AppBridge):
         and the packaged app is built without a console, so the one string
         needed to add a second machine was written where nobody could read it.
         """
+        from capture.audio import find_loopback_device
+        from capture.config import get_capture_settings
         from paths import data_dir
         from server.config import get_settings
 
@@ -364,12 +391,23 @@ class SetupApi(AppBridge):
         settings = get_settings()
         now = self.current()
         hosting = _is_local(now["url"])
+
+        # Windows ships no desktop-audio capture device, so a clip is silent
+        # until one exists. Reported here because the alternative way to find
+        # out is to record something worth keeping and play it back.
+        try:
+            audio = find_loopback_device(get_capture_settings().audio_device) or ""
+        except Exception as exc:  # noqa: BLE001
+            warn("audio device", exc, "settings cannot say whether clips have sound")
+            audio = ""
+
         return {
             "hosting": hosting,
             "server": now["url"],
             "public": settings.public_base_url,
             "invite": settings.invite_code if hosting else "",
             "folder": str(data_dir()),
+            "audio": audio,
         }
 
     def test(self, url: str, key: str) -> dict:
@@ -422,9 +460,9 @@ class SetupApi(AppBridge):
         except OSError as exc:
             return {"ok": False, "message": f"Could not write settings: {exc}"}
         self.saved = True
-        self._on_saved()
+        _later(self._on_saved)
         return {"ok": True}
 
     def skip(self) -> dict:
-        self._on_skipped()
+        _later(self._on_skipped)
         return {"ok": True}
