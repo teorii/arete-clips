@@ -66,30 +66,12 @@ result for dedup, extracting a poster frame) rather than by the remux itself.
 | `server/main.py` | Clip API and share pages. Never touches video bytes in production. |
 | `server/models.py` | SQLAlchemy schema. |
 | `server/storage.py` | Storage behind one interface: local disk for dev, Cloudflare R2 for real. |
-| `sql/001_init.sql` | Canonical Postgres schema for when `DATABASE_URL` points at Supabase. |
 | `frontend/src/App.tsx` | Clip manager: grid, search, pinned filter, recent links. |
 | `frontend/src/ClipDetail.tsx` | Player with rename, pin, copy, delete and arrow-key navigation. |
 | `frontend/src/useClips.ts` | Cursor-paginated list with stale-response guarding. |
 | `branding.py` | The name, the colours and the drawing of the app mark. One source for tray, window and executable. |
 | `tools/make_icon.py` | Renders that mark to `assets/arete.ico` and the web favicon. |
 | `tools/make_launcher.py` | Builds `.venv\Scripts\Arete.exe`, the launcher that gives Task Manager the name and icon. |
-
-## Setup
-
-```bash
-winget install --id Gyan.FFmpeg -e
-python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
-copy .env.example .env
-.venv\Scripts\python tools\make_icon.py
-.venv\Scripts\python tools\make_launcher.py
-```
-
-Find the display you play on, then set `DDAGRAB_OUTPUT_IDX` in `.env`:
-
-```bash
-.venv\Scripts\python -m capture.daemon --probe
-```
 
 ## Run it as an app
 
@@ -119,22 +101,32 @@ python desktop.py --verbose       # log every HTTP request, open devtools
 python desktop.py --no-tray       # no tray; closing the window quits
 ```
 
-## Run the pieces separately
+## Setup
 
-Useful for development. Two terminals.
+Run `Arete.exe`. It asks three things and then records:
 
-```bash
-.venv\Scripts\python -m uvicorn server.main:app --port 8000
-```
+- **Where clips live.** This PC by default, which needs nothing installed: a
+  SQLite file and a folder, both under `%APPDATA%\Arete`. The alternative is
+  sending them to someone else's Arete, which needs their address and an
+  invite code.
+- **What to record.** A running program, or a display directly. Capture is per
+  display, so picking a program just selects the display it is on.
+- **How much.** Clip length and the hotkey.
 
-```bash
-.venv\Scripts\python -m capture.daemon
-```
+There is no key to obtain. A hosting install creates its own account on first
+start, and prints an address and invite code so another machine can join it.
 
-Press **F9** in game. The link is printed and copied to your clipboard.
+## Sharing
 
-`--test` warms the buffer, takes one clip and exits, which is the fastest way
-to check the whole path without opening a game.
+The app opens a tunnel so links work off this machine, and closes it on quit.
+`MANAGE_TUNNEL=false` turns that off, and links then only resolve locally.
+
+A quick tunnel gets a **new hostname every launch**, so links from a previous
+session stop working. That is the one thing to know before sending anyone a
+link you expect to last.
+
+Clip files are served from the same host, so a link carries both the page and
+the video. Anyone with the link can watch; listing the library needs a key.
 
 ## The clip manager
 
@@ -179,126 +171,6 @@ accuracy would mean re-encoding the partial group of pictures at each edge.
 
 Trimming replaces the clip. That is the point: the 25 seconds of walking back
 to lane stop existing.
-
-## Running it on a second machine
-
-Every client carries an API key. It decides whose library a clip lands in, and
-without one the API answers 401 to everything except share pages.
-
-On the host, issue a key per person:
-
-```bash
-python -m tools.add_user --handle seth --adopt-existing
-python -m tools.add_user --handle james
-```
-
-`--adopt-existing` takes ownership of clips captured before keys existed, so an
-upgrade does not orphan a library. The key is printed once; only its SHA-256 is
-stored, so it cannot be recovered, only reissued. `--revoke <handle>` disables
-one without touching that person's clips.
-
-Each machine puts its own key in `.env`:
-
-```
-ARETE_API_KEY=arete_...
-API_BASE_URL=https://wherever-the-host-is
-```
-
-The second machine needs no server of its own. Pointing `API_BASE_URL` at the
-host is enough: the app notices it is not the host, skips starting uvicorn, and
-opens its window against the shared API. Mode is derived rather than being a
-flag someone forgets to set.
-
-What stays public, deliberately: `/c/<slug>` and the clip files themselves. A
-share link that needed a key would not be a share link. Everything else, the
-library listing included, needs one.
-
-Libraries are separate. Acting on someone else's clip returns 404 rather than
-403, since a 403 would confirm the clip exists.
-
-## Sharing beyond this machine
-
-Links resolve to `localhost` by default, which means they only work here. For
-the same network, set `BIND_HOST=0.0.0.0` and point `PUBLIC_BASE_URL` at your
-LAN address. There is no auth, so anyone who can reach the port can view and
-delete clips: only do that on a network you trust.
-
-## The self-hosted stack
-
-Three local processes, no third-party accounts.
-
-| Part | What runs it |
-|---|---|
-| Database | Postgres on 127.0.0.1:5432, database `arete` |
-| Object storage | MinIO on 127.0.0.1:9000, bucket `clips` |
-| App | `Arete.bat` |
-
-The app starts storage and the tunnels itself, so the only thing to do by hand
-is Postgres, which is a Windows service and needs an elevated shell:
-
-```
-net start postgresql-x64-18
-```
-
-`MANAGE_STORAGE` and `MANAGE_TUNNEL` in the config turn each off. Turning off
-the tunnel is worth considering: a quick tunnel gets a new public hostname on
-every launch, so links from a previous session stop working.
-
-Storage is adopted rather than restarted if something is already serving on its
-port, so running the app beside a terminal copy does not produce two processes
-fighting over one data directory. `MINIO_DATA_DIR` points at an existing store.
-
-To run the pieces by hand instead:
-
-```
-net start postgresql-x64-18        (needs an admin shell)
-scripts\start-storage.bat          (leave it open)
-```
-
-The app checks both on launch and tells you which one is down rather than
-opening onto an empty library.
-
-First-time storage setup, safe to re-run:
-
-```bash
-python -m tools.setup_storage
-```
-
-That creates the bucket and allows anonymous `GetObject` on its contents, which
-is what lets someone open a share link with no credentials. Listing is not
-granted, so keys cannot be enumerated, and every key carries an unguessable
-clip id.
-
-### Moving an existing library onto it
-
-```bash
-python -m tools.migrate_data --source sqlite:///./recording.db --files ./clips_local
-```
-
-Copies users, clips and renditions into whatever `DATABASE_URL` points at, then
-uploads the files into whatever `STORAGE_BACKEND` points at. Re-runnable: rows
-already present are skipped, files already stored at the right size are not
-re-uploaded, so an interrupted run just gets run again.
-
-### Why S3 rather than a folder
-
-The same backend talks to a local MinIO, a MinIO on a server, Cloudflare R2 or
-S3 itself, because presigned PUT and public GET are the only operations used.
-That is what makes self-hosting now and moving to a server later the same code
-path instead of two, and it is why nothing here is tied to this desktop.
-
-## Going from prototype to real
-
-Both swaps are configuration, not code.
-
-**Postgres.** Run `sql/001_init.sql` against a Supabase project, then set
-`DATABASE_URL=postgresql+psycopg://...`. SQLite is the zero-setup default so
-the server boots with nothing installed.
-
-**Object storage.** Create an R2 bucket, then set `STORAGE_BACKEND=r2` plus the
-four `R2_*` values. The client code does not change: it already asks the API
-where to put bytes and PUTs them there. The local backend exists to mirror that
-contract, and it is the only place bytes pass through the app tier.
 
 ## What is deliberately not built yet
 

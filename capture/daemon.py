@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from paths import data_dir
+from problems import warn
 
 from . import sound
 from .cutter import ClipError, flush
@@ -40,8 +41,8 @@ def gpu_name() -> str:
         )
         if result.returncode == 0:
             return result.stdout.strip().splitlines()[0]
-    except (OSError, subprocess.SubprocessError):
-        pass
+    except (OSError, subprocess.SubprocessError) as exc:
+        warn("gpu name", exc, "capture metadata will say unknown")
     return "unknown"
 
 
@@ -49,7 +50,8 @@ def copy_to_clipboard(text: str) -> bool:
     try:
         subprocess.run(["clip"], input=text.encode("utf-16le"), shell=True, timeout=5)
         return True
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.SubprocessError) as exc:
+        warn("clipboard", exc, "the link was not copied, read it above")
         return False
 
 
@@ -92,9 +94,10 @@ class Daemon:
             from .windows import program_on_display
 
             return program_on_display(self.s.ddagrab_output_idx)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             # Never worth failing a clip over: an unnamed clip is fine, a lost
             # one is not.
+            warn("program name", exc, "this clip will be untitled")
             return None
 
     def capture_meta(self, width: int, height: int) -> dict:

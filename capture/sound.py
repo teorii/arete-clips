@@ -18,6 +18,7 @@ import wave
 from pathlib import Path
 
 from paths import data_dir
+from problems import warn
 
 _RATE = 44100
 
@@ -50,7 +51,8 @@ def _ensure(name: str, tones: tuple[tuple[float, float], ...]) -> Path | None:
         return path
     try:
         _write_tones(path, tones)
-    except OSError:
+    except OSError as exc:
+        warn("sound", exc, "clips will be silent to take, so watch the tray instead")
         return None
     return path
 
@@ -63,8 +65,10 @@ def _play(path: Path | None) -> None:
 
         # Async so a clip never waits on audio, and never blocks the hotkey.
         winsound.PlaySound(str(path), winsound.SND_FILENAME | winsound.SND_ASYNC)
-    except Exception:  # noqa: BLE001
-        pass  # no audio device, or not Windows. Never worth an error.
+    except Exception as exc:  # noqa: BLE001
+        # A missing audio device should not stop a recording, but it does mean
+        # the only immediate confirmation of a clip is gone.
+        warn("sound", exc, "no audible confirmation when a clip is taken")
 
 
 def clip_saved() -> None:

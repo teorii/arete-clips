@@ -45,20 +45,25 @@ Requires ffmpeg on PATH (or installed via winget) and an NVENC-capable GPU.
 
 ## Where things run
 
-Self-hosted, no SaaS. Postgres on 5432 (`arete`), MinIO on 9000 (bucket
-`clips`), app on 8000. `desktop.py` preflights both and names whichever is
-down. The host starts MinIO and the tunnels itself (`services.py`), adopting anything
-already running rather than duplicating it. Postgres stays manual because
-starting a service needs elevation. Order matters at startup: tunnels rewrite
-the public addresses, so they must run before any server module imports and
-caches settings, which is why `host_flag` reads the config file directly.
+One process. SQLite in `%APPDATA%\Arete`, clip files in a folder beside it,
+the API on 8000, and a Cloudflare tunnel the app opens itself so links work off
+the machine. Nothing to install, nothing else to start.
 
-`server/models.py` is the schema source of truth and `server/migrate.py` builds
-it. `sql/001_init.sql` is a reference that records reasoning, not something that
-runs; if they disagree, the models are right.
+Postgres and MinIO were tried and removed: they are the right answer at a size
+this will not reach, and they made an install something you had to assemble.
+`server/models.py` is the schema, `server/migrate.py` builds it.
 
-The storage backend is S3-shaped on purpose: MinIO locally and R2 or S3 on a
-server are the same code, which is what keeps this deployable off this desktop.
+An install hosts its own clips by default. Pointing `API_BASE_URL` at another
+Arete makes it a client of that one instead, and `desktop.py` derives the mode
+from that rather than from a flag.
+
+## Failing loudly
+
+`problems.warn(where, exception, consequence)` is how anything survivable gets
+reported, and the consequence is the part that matters: "clips will not be
+named" beats "could not read the process". Nothing is swallowed. A recorder
+that quietly does nothing is worse than one that crashes, because you find out
+by pressing the key after the moment you wanted.
 
 ## Identity
 
@@ -112,7 +117,6 @@ assets/     arete.ico, the icon Windows reads for taskbar and Task Manager
 server/     FastAPI. main.py routes, models.py schema, storage.py backends
 capture/    Windows client. ringbuffer.py -> cutter.py -> uploader.py
 frontend/   React + Vite clip manager, served at /app
-sql/        Canonical Postgres DDL for the Supabase swap
 docs/design/  The system design this implements
 ```
 
@@ -132,13 +136,6 @@ storage, flips status to `ready`) -> `GET /c/{slug}`.
 - Errors: raise `HTTPException` in routes; the capture client catches narrow
   exception types and keeps failed uploads in the journal rather than dropping.
 - Storage keys, never URLs, in the database. Domains and signing schemes change.
-
-## Swapping the prototype pieces
-
-Both are env vars in `.env`, not code changes:
-
-- **Postgres**: run `sql/001_init.sql` against Supabase, set `DATABASE_URL=postgresql+psycopg://...`
-- **Object storage**: set `STORAGE_BACKEND=r2` plus the four `R2_*` values
 
 ## Tests
 

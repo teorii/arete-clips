@@ -49,7 +49,7 @@ from branding import APP_ID, APP_NAME  # noqa: E402
 from capture.daemon import Daemon  # noqa: E402
 from capture.hotkey import pump, stop as hotkey_stop  # noqa: E402
 from paths import bundle_dir, config_file, is_configured  # noqa: E402
-from services import StorageServer, Tunnels, update_config  # noqa: E402
+from services import Tunnels, update_config  # noqa: E402
 from setup import SetupApi, setup_page  # noqa: E402
 from tray import Tray  # noqa: E402
 
@@ -426,17 +426,16 @@ class CaptureService:
 
 
 def preflight() -> bool:
-    """Check the services the app depends on before opening a window.
+    """Check what the app writes to before opening a window.
 
-    Self-hosting means Postgres and the object store are separate processes that
-    can simply be off. Finding that out from an empty library and a stack trace
-    in a log file is worse than being told which one is not running.
+    Both are local now, so this is not about services being down: it is about a
+    database file that cannot be opened or a folder that cannot be written,
+    which would otherwise surface as clips silently failing to save.
     """
     from sqlalchemy import text as sql_text
 
     from server.config import get_settings
     from server.db import engine
-    from server.storage import get_storage
 
     settings = get_settings()
     ok = True
@@ -445,20 +444,18 @@ def preflight() -> bool:
         with engine.connect() as conn:
             conn.execute(sql_text("select 1"))
     except Exception as exc:  # noqa: BLE001
-        target = settings.database_url.split("@")[-1]
-        print(f"Database unreachable ({target}): {type(exc).__name__}")
-        if "postgresql" in settings.database_url:
-            print("  Start it with:  net start postgresql-x64-18   (needs admin)")
+        print(f"Cannot open the database ({settings.database_url}): {type(exc).__name__}: {exc}")
         ok = False
 
-    if settings.storage_backend in {"s3", "r2"}:
-        try:
-            get_storage().size_of("preflight-probe-that-does-not-exist")
-        except Exception as exc:  # noqa: BLE001
-            print(f"Object storage unreachable ({settings.s3_endpoint_url}): "
-                  f"{type(exc).__name__}")
-            print(r"  Start it with:  scripts\start-storage.bat")
-            ok = False
+    clips = Path(settings.local_storage_dir)
+    try:
+        clips.mkdir(parents=True, exist_ok=True)
+        probe = clips / ".writable"
+        probe.write_bytes(b"")
+        probe.unlink()
+    except OSError as exc:
+        print(f"Cannot write clips to {clips}: {exc}")
+        ok = False
 
     return ok
 
@@ -489,7 +486,6 @@ def main() -> int:
     claim_taskbar_identity()
 
     api: ApiServer | None = None
-    storage: StorageServer | None = None
     tunnels: Tunnels | None = None
     configured = is_configured()
 
@@ -508,7 +504,7 @@ def main() -> int:
         return check_client()
 
     def start_host() -> bool:
-        nonlocal api, storage, tunnels
+        nonlocal api, tunnels
 
         if not DIST.is_dir():
             print("frontend/dist is missing. Build it:  cd frontend && npm run build")
@@ -532,24 +528,6 @@ def main() -> int:
 
             update_config(INVITE_CODE=generate_key().replace("arete_", "join_")[:20])
 
-        # Storage first: the API hands out upload URLs pointing at it, and the
-        # tunnel that publishes it has to have something to publish.
-        if host_flag("MANAGE_STORAGE", True):
-            from server.config import Settings
-
-            settings = Settings()
-            storage = StorageServer(
-                settings.s3_access_key_id,
-                settings.s3_secret_access_key,
-                directory=settings.minio_data_dir or None,
-            )
-            if settings.storage_backend in {"s3", "r2"} and settings.s3_endpoint_url:
-                print("Starting object storage...")
-                if storage.start():
-                    print(f"  storage ready{' (already running)' if storage.adopted else ''}")
-                else:
-                    print("  storage did not start; clips will fail to upload")
-
         # Tunnels before the API, because they rewrite the public addresses the
         # API bakes into every share page and upload URL when it imports.
         if host_flag("MANAGE_TUNNEL", True):
@@ -561,20 +539,13 @@ def main() -> int:
             else:
                 print("  no tunnel; links will only work on this machine")
 
-        # The addresses just changed, so anything built from the old ones is
-        # wrong. Rebuild, then make sure the bucket exists and is readable.
-        if host_flag("MANAGE_STORAGE", True):
-            from server.config import get_settings
-            from server.storage import S3Storage, get_storage, reset_storage
+        # The addresses just changed, so a backend built from the old ones would
+        # sign upload URLs nobody can reach.
+        from server.config import get_settings
+        from server.storage import reset_storage
 
-            get_settings.cache_clear()
-            reset_storage()
-            try:
-                backend = get_storage()
-                if isinstance(backend, S3Storage):
-                    backend.ensure_bucket(public_read=True)
-            except Exception as exc:  # noqa: BLE001
-                print(f"  could not prepare the bucket: {exc}")
+        get_settings.cache_clear()
+        reset_storage()
 
         api = ApiServer(verbose=args.verbose)
         api.start()
@@ -783,11 +754,8 @@ def main() -> int:
         services["capture"].stop()
         if api is not None:
             api.stop()
-        # Reverse order: stop publishing before removing what was published.
         if tunnels is not None:
             tunnels.stop()
-        if storage is not None:
-            storage.stop()
     return 0
 
 

@@ -18,7 +18,7 @@ from uuid import UUID
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_, select, tuple_
@@ -533,52 +533,52 @@ def share_page(
     )
 
 
-@app.get("/", response_class=HTMLResponse)
-def library_page(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
-    page = list_clips(cursor=None, limit=60, db=db)
-    return templates.TemplateResponse(request, "library.html", {"clips": page.items})
+@app.get("/")
+def root() -> RedirectResponse:
+    """There is one library, and it is the app."""
+    return RedirectResponse("/app/")
 
 
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
-    return {"status": "ok", "storage": settings.storage_backend}
+    """Reachability, nothing more. Setup uses it to tell a real server from a
+    hostname that merely resolves."""
+    return {"status": "ok", "app": "arete"}
 
 
-# ------------------------------------------------ local dev storage endpoints
-# Only mounted when STORAGE_BACKEND=local. With R2 these do not exist and the
-# bytes never touch this process at all.
+# ------------------------------------------------------------ file endpoints
+# How clip bytes get in and out. The upload URL is signed and short lived,
+# which is what lets another machine upload here with no shared credential.
 
-if settings.storage_backend == "local":
+@app.put("/upload")
+async def upload(
+    request: Request, key: str, expires: int, sig: str
+) -> dict[str, int]:
+    storage = get_storage()
+    assert isinstance(storage, LocalStorage)
+    if not storage.verify(key, expires, sig):
+        raise HTTPException(403, "bad or expired upload signature")
+    body = await request.body()
+    if not body:
+        raise HTTPException(400, "empty body")
+    try:
+        written = storage.write(key, body)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"bytes": written}
 
-    @app.put("/dev-upload")
-    async def dev_upload(
-        request: Request, key: str, expires: int, sig: str
-    ) -> dict[str, int]:
-        storage = get_storage()
-        assert isinstance(storage, LocalStorage)
-        if not storage.verify(key, expires, sig):
-            raise HTTPException(403, "bad or expired upload signature")
-        body = await request.body()
-        if not body:
-            raise HTTPException(400, "empty body")
-        try:
-            written = storage.write(key, body)
-        except ValueError as exc:
-            raise HTTPException(400, str(exc)) from exc
-        return {"bytes": written}
-
-    @app.get("/files/{key:path}")
-    def dev_file(key: str) -> FileResponse:
-        storage = get_storage()
-        assert isinstance(storage, LocalStorage)
-        try:
-            target = storage.path_for(key)
-        except ValueError as exc:
-            raise HTTPException(400, str(exc)) from exc
-        if not target.exists():
-            raise HTTPException(404, "not found")
-        # FileResponse honours Range requests, which is what lets a player seek.
-        return FileResponse(target)
+@app.get("/files/{key:path}")
+def serve_file(key: str) -> FileResponse:
+    storage = get_storage()
+    assert isinstance(storage, LocalStorage)
+    try:
+        target = storage.path_for(key)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    if not target.exists():
+        raise HTTPException(404, "not found")
+    # FileResponse honours Range requests, which is what lets a player seek.
+    return FileResponse(target)
 
 
 # --------------------------------------------------------------- built SPA

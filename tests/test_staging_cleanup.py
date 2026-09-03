@@ -132,3 +132,17 @@ def test_renaming_to_nothing_clears_the_title(tmp_path):
 
 def test_renaming_an_unknown_clip_reports_failure(tmp_path):
     assert make_uploader(tmp_path).rename("nope.mp4", "x") is False
+
+
+def test_a_corrupt_journal_is_preserved_rather_than_silently_emptied(tmp_path, capsys):
+    """The old behaviour returned an empty list, so every clip waiting for a
+    link vanished from the library and the next write overwrote the evidence."""
+    uploader = make_uploader(tmp_path)
+    uploader.journal_path.write_text("{not json at all", encoding="utf-8")
+
+    assert uploader.waiting() == []
+
+    spoiled = uploader.journal_path.with_suffix(".corrupt")
+    assert spoiled.exists(), "the bad journal was thrown away"
+    assert spoiled.read_text(encoding="utf-8") == "{not json at all"
+    assert "journal" in capsys.readouterr().out, "the failure was not reported"

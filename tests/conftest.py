@@ -16,7 +16,6 @@ _TMP = Path(tempfile.mkdtemp(prefix="arete_tests_"))
 # same host means the presigned upload URLs it hands back are directly usable.
 os.environ["PUBLIC_BASE_URL"] = "http://testserver"
 os.environ["DATABASE_URL"] = f"sqlite:///{(_TMP / 'test.db').as_posix()}"
-os.environ["STORAGE_BACKEND"] = "local"
 os.environ["LOCAL_STORAGE_DIR"] = str(_TMP / "storage")
 os.environ["UPLOAD_SECRET"] = "test-secret"
 

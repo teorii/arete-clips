@@ -1,13 +1,13 @@
-"""Object storage behind one interface.
+"""Where clip files live.
 
-The client always does the same three steps: ask the API where to put bytes,
-PUT the bytes at that URL, then tell the API it finished. Whether that URL
-points at Cloudflare R2 or at a local dev endpoint is invisible to the client,
-so moving to real object storage is an env var rather than a rewrite.
+The client asks the API for somewhere to put bytes, PUTs them there, then says
+it finished. That indirection is what lets a second machine upload to a host it
+does not share a disk with: the URL it is handed is signed, time limited, and
+points at the host rather than at anything local to it.
 
-The rule this preserves: video bytes never pass through the application tier in
-production. In local mode they do, which is the one honest compromise here and
-is confined to LocalStorage.
+Files are served from a folder. An install is meant to need nothing installed,
+and an object store would be a second service to run for no benefit at this
+size.
 """
 
 from __future__ import annotations
@@ -92,7 +92,7 @@ class LocalStorage(StorageBackend):
         expires = int(time.time()) + self.ttl
         qs = urlencode({"key": key, "expires": expires, "sig": self._sign(key, expires)})
         return UploadTarget(
-            url=f"{self.base_url}/dev-upload?{qs}",
+            url=f"{self.base_url}/upload?{qs}",
             headers={"Content-Type": content_type},
         )
 
@@ -126,143 +126,6 @@ class LocalStorage(StorageBackend):
         return self.write(key, Path(source).read_bytes())
 
 
-class S3Storage(StorageBackend):
-    """Anything speaking the S3 API.
-
-    One backend covers MinIO on this machine, MinIO on a server, Cloudflare R2
-    and S3 itself, because presigned PUT and GET are the only operations used.
-    That is what makes self-hosting and a managed bucket the same code path
-    rather than two.
-    """
-
-    def __init__(self, settings: Settings) -> None:
-        import boto3
-        from botocore.config import Config
-
-        if not settings.s3_endpoint_url:
-            raise RuntimeError(
-                "STORAGE_BACKEND=s3 needs S3_ENDPOINT_URL, for example "
-                "http://127.0.0.1:9000 for a local MinIO"
-            )
-
-        self.bucket = settings.s3_bucket
-        self.ttl = settings.upload_url_ttl_seconds
-        # Falls back to the endpoint, which is what a local MinIO serves from.
-        self.public_base = (
-            settings.s3_public_base_url or f"{settings.s3_endpoint_url}/{settings.s3_bucket}"
-        ).rstrip("/")
-        config = Config(
-            signature_version="s3v4",
-            s3={"addressing_style": "path" if settings.s3_force_path_style else "auto"},
-        )
-        credentials = dict(
-            aws_access_key_id=settings.s3_access_key_id,
-            aws_secret_access_key=settings.s3_secret_access_key,
-            region_name=settings.s3_region,
-            config=config,
-        )
-
-        # How this process reaches storage.
-        self.client = boto3.client(
-            "s3", endpoint_url=settings.s3_endpoint_url, **credentials
-        )
-
-        # What clients are told to upload to. A signature covers the host, so a
-        # URL a remote machine can use has to be signed for the host it will
-        # actually contact. Same client when there is no separate public
-        # address, which is the single-machine case.
-        public_endpoint = settings.s3_public_endpoint_url or settings.s3_endpoint_url
-        self.signer = (
-            self.client
-            if public_endpoint == settings.s3_endpoint_url
-            else boto3.client("s3", endpoint_url=public_endpoint, **credentials)
-        )
-
-    def ensure_bucket(self, public_read: bool = True) -> None:
-        """Create the bucket, and let anyone read an object they can name.
-
-        Playback has to work for someone who was handed a link and has no
-        credentials, which is the entire point of a share link. The policy
-        grants GetObject and nothing else: listing stays denied, so keys cannot
-        be enumerated, and a key contains a UUIDv7 clip id that is not
-        guessable. That is the same model as an R2 public bucket.
-
-        Called explicitly by tools/setup_storage.py rather than at runtime,
-        because making a bucket world-readable should be something you ran on
-        purpose.
-        """
-        import json
-
-        from botocore.exceptions import ClientError
-
-        try:
-            self.client.head_bucket(Bucket=self.bucket)
-        except ClientError:
-            self.client.create_bucket(Bucket=self.bucket)
-
-        if not public_read:
-            return
-        self.client.put_bucket_policy(
-            Bucket=self.bucket,
-            Policy=json.dumps(
-                {
-                    "Version": "2012-10-17",
-                    "Statement": [
-                        {
-                            "Effect": "Allow",
-                            "Principal": {"AWS": ["*"]},
-                            "Action": ["s3:GetObject"],
-                            "Resource": [f"arn:aws:s3:::{self.bucket}/*"],
-                        }
-                    ],
-                }
-            ),
-        )
-
-    def create_upload(self, key: str, content_type: str) -> UploadTarget:
-        url = self.signer.generate_presigned_url(
-            "put_object",
-            Params={"Bucket": self.bucket, "Key": key, "ContentType": content_type},
-            ExpiresIn=self.ttl,
-        )
-        # The signature covers Content-Type, so the client must send it back.
-        return UploadTarget(url=url, headers={"Content-Type": content_type})
-
-    def playback_url(self, key: str) -> str:
-        return f"{self.public_base}/{quote(key)}"
-
-    def size_of(self, key: str) -> int | None:
-        from botocore.exceptions import ClientError
-
-        try:
-            return self.client.head_object(Bucket=self.bucket, Key=key)["ContentLength"]
-        except ClientError:
-            return None
-
-    def delete(self, key: str) -> None:
-        self.client.delete_object(Bucket=self.bucket, Key=key)
-
-    def download(self, key: str, destination: Path) -> bool:
-        from botocore.exceptions import ClientError
-
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            self.client.download_file(self.bucket, key, str(destination))
-        except ClientError:
-            return False
-        return True
-
-    def upload(self, key: str, source: Path, content_type: str) -> int:
-        source = Path(source)
-        self.client.upload_file(
-            str(source),
-            self.bucket,
-            key,
-            ExtraArgs={"ContentType": content_type},
-        )
-        return source.stat().st_size
-
-
 _backend: StorageBackend | None = None
 
 
@@ -281,9 +144,5 @@ def get_storage() -> StorageBackend:
     global _backend
     if _backend is None:
         settings = get_settings()
-        # "r2" still accepted: it is the same protocol under a different name.
-        if settings.storage_backend in {"s3", "r2"}:
-            _backend = S3Storage(settings)
-        else:
-            _backend = LocalStorage(settings)
+        _backend = LocalStorage(settings)
     return _backend

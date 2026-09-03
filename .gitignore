@@ -37,3 +37,9 @@ dist_app/
 build_app/
 dist_onefile/
 build_onefile/
+
+# runtime artifacts when running from source (data_dir is the project folder)
+arete.log
+*.wav
+storage/
+*.db.backup-*

@@ -1,11 +1,7 @@
-"""Starting the things the host needs, so they are not windows to remember.
+"""Publishing the host, so it is not a window to remember.
 
-Only the host does any of this. A second machine talks to an API someone else
-is running and starts nothing.
-
-Postgres is deliberately not managed here: it is a Windows service and starting
-it needs elevation, so the app checks it and says what to run rather than
-pretending it can.
+Only the host does this. A machine that sends its clips somewhere else talks to
+an API someone else is running and starts nothing.
 """
 
 from __future__ import annotations
@@ -19,7 +15,7 @@ import threading
 import time
 from pathlib import Path
 
-from paths import bundle_dir, config_file, data_dir
+from paths import bundle_dir, config_file
 
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 _TUNNEL_URL = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
@@ -73,71 +69,6 @@ def update_config(**values: str) -> None:
         else:
             text = text.rstrip("\n") + f"\n{line}\n"
     path.write_text(text, encoding="utf-8")
-
-
-class StorageServer:
-    """MinIO, started only if nothing is already serving on its port.
-
-    Adopting a server someone else started matters: running the app while a
-    terminal copy is up must not produce two processes fighting over the same
-    data directory.
-    """
-
-    PORT = 9000
-
-    def __init__(self, access_key: str, secret_key: str, directory: Path | None = None):
-        self.access_key = access_key
-        self.secret_key = secret_key
-        self.directory = Path(directory or data_dir() / "storage")
-        self.proc: subprocess.Popen | None = None
-        self.adopted = False
-
-    def start(self, timeout: float = 20.0) -> bool:
-        if port_open(self.PORT):
-            self.adopted = True
-            return True
-
-        binary = find_binary("minio")
-        if not binary:
-            print("  MinIO not found. Install it:  winget install --id MinIO.Server -e")
-            return False
-        if not (self.access_key and self.secret_key):
-            print("  Storage credentials are not set, so MinIO cannot start.")
-            return False
-
-        self.directory.mkdir(parents=True, exist_ok=True)
-        self.proc = subprocess.Popen(
-            [binary, "server", str(self.directory),
-             "--address", f"127.0.0.1:{self.PORT}",
-             "--console-address", "127.0.0.1:9001"],
-            env={**os.environ,
-                 "MINIO_ROOT_USER": self.access_key,
-                 "MINIO_ROOT_PASSWORD": self.secret_key},
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            stdin=subprocess.DEVNULL, creationflags=_NO_WINDOW,
-        )
-
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            if port_open(self.PORT):
-                return True
-            if self.proc.poll() is not None:
-                print("  MinIO exited while starting.")
-                return False
-            time.sleep(0.25)
-        print(f"  MinIO did not open port {self.PORT} within {timeout:g}s.")
-        return False
-
-    def stop(self) -> None:
-        # Never kill a server this process did not start.
-        if self.adopted or self.proc is None:
-            return
-        self.proc.terminate()
-        try:
-            self.proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            self.proc.kill()
-        self.proc = None
 
 
 class Tunnel:

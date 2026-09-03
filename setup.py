@@ -19,6 +19,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from paths import bundle_dir, config_file
+from problems import warn
 
 
 def _thumbnail_data_uri(path: str | None) -> str | None:
@@ -36,7 +37,8 @@ def _thumbnail_data_uri(path: str | None) -> str | None:
         return None
     try:
         encoded = base64.b64encode(file.read_bytes()).decode("ascii")
-    except OSError:
+    except OSError as exc:
+        warn("poster", exc, "this clip will show an empty thumbnail")
         return None
     return f"data:image/jpeg;base64,{encoded}"
 
@@ -106,7 +108,8 @@ class AppBridge:
         """Clips captured on this machine that have no link yet."""
         try:
             entries = self._uploader().waiting()
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            warn("held clips", exc, "the library will not show clips waiting for a link")
             return []
         return [
             {

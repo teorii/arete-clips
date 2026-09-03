@@ -20,6 +20,8 @@ import subprocess
 import time
 from pathlib import Path
 
+from problems import warn
+
 from .audio import find_loopback_device
 from .config import CaptureSettings
 from .ffmpeg import FFMPEG
@@ -177,8 +179,11 @@ class RingBuffer:
             dst = staging / f"part{index:03d}.ts"
             try:
                 shutil.copy2(src, dst)
-            except OSError:
-                continue  # recycled mid-copy; the remaining parts still work
+            except OSError as exc:
+                # The ring recycled this file mid-copy. The rest still make a
+                # clip, just a shorter one, which is worth knowing about.
+                warn("ring buffer", exc, f"{src.name} missing from this clip")
+                continue
             if dst.stat().st_size > 0:
                 staged.append(dst)
         return staged

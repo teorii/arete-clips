@@ -12,6 +12,8 @@ import subprocess
 
 import httpx
 
+from problems import warn
+
 from .ffmpeg import FFMPEG
 
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -45,7 +47,8 @@ def has_nvenc() -> bool:
             "-f", "lavfi", "-i", "color=c=black:s=256x144:r=30",
             "-frames:v", "1", "-c:v", "h264_nvenc", "-f", "null", "-",
         ])
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.SubprocessError) as exc:
+        warn("encoder check", exc, "treating this machine as having no encoder")
         return False
     return result.returncode == 0
 
@@ -57,8 +60,8 @@ def gpu_name() -> str:
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip().splitlines()[0]
-    except (OSError, subprocess.SubprocessError):
-        pass
+    except (OSError, subprocess.SubprocessError) as exc:
+        warn("gpu name", exc)
     return ""
 
 
@@ -72,7 +75,8 @@ def list_displays(maximum: int = 4) -> list[dict]:
                 "-f", "lavfi", "-i", f"ddagrab=output_idx={index}:framerate=30",
                 "-frames:v", "1", "-f", "null", "-",
             ], timeout=20)
-        except (OSError, subprocess.SubprocessError):
+        except (OSError, subprocess.SubprocessError) as exc:
+            warn("display probe", exc, f"stopping at display {index}")
             break
         if result.returncode != 0:
             # The first unavailable index means there are no more displays.

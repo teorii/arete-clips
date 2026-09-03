@@ -20,6 +20,8 @@ from pathlib import Path
 
 import httpx
 
+from problems import warn
+
 from .cutter import ClipResult
 
 
@@ -63,7 +65,21 @@ class Uploader:
             return []
         try:
             return json.loads(self.journal_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError) as exc:
+            # Returning an empty list here would drop every clip waiting to be
+            # shared, silently, and the next write would overwrite the evidence.
+            # Move it aside instead: the clips are still on disk, and a named
+            # file is something a person can look at.
+            spoiled = self.journal_path.with_suffix(".corrupt")
+            try:
+                self.journal_path.replace(spoiled)
+            except OSError as move_failure:
+                warn("journal", move_failure, "could not set the bad file aside")
+            warn(
+                "journal",
+                exc,
+                f"clips awaiting a link are not listed; the old file is at {spoiled}",
+            )
             return []
 
     def _save(self, entries: list[dict]) -> None:
@@ -260,8 +276,8 @@ class Uploader:
                 continue
             try:
                 path.unlink(missing_ok=True)
-            except OSError:
-                pass  # a locked file is not worth failing a finished upload
+            except OSError as exc:
+                warn("staging", exc, f"{path.name} is still using disk")
 
     def sweep_staging(self, directory: Path) -> int:
         """Delete staging files no longer waiting to be uploaded.
@@ -287,8 +303,8 @@ class Uploader:
             try:
                 path.unlink()
                 removed += 1
-            except OSError:
-                pass
+            except OSError as exc:
+                warn("staging", exc, f"could not remove {path.name}")
         return removed
 
     # ------------------------------------------------------------- plumbing

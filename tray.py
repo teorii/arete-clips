@@ -17,6 +17,7 @@ from collections.abc import Callable
 import pystray
 
 from branding import APP_NAME, icon_image
+from problems import warn
 
 # Windows hands the notification area a 16px icon on a 100% display and scales
 # from whatever it is given, so render above the largest DPI it will ask for.
@@ -80,21 +81,22 @@ class Tray:
     def stop(self) -> None:
         try:
             self.icon.stop()
-        except Exception:  # noqa: BLE001
-            pass  # already torn down; nothing useful to do during shutdown
+        except Exception as exc:  # noqa: BLE001
+            warn("tray", exc, "icon may linger until the process exits")
 
     def set_recording(self, recording: bool) -> None:
         self.recording = recording
         try:
             self.icon.icon = icon_image(_SIZE, recording=recording)
             self.icon.update_menu()
-        except Exception:  # noqa: BLE001
-            pass  # cosmetic only, never worth taking the app down for
+        except Exception as exc:  # noqa: BLE001
+            # Not cosmetic: this light is the only sign that capture stopped.
+            warn("tray", exc, "the status light is now wrong")
 
     def notify(self, message: str, title: str = APP_NAME) -> None:
         """Balloon notification. Best effort: some Windows configurations
         suppress these entirely, and a missing toast is not worth an error."""
         try:
             self.icon.notify(message, title)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001
+            warn("tray", exc, f"this went unseen: {message}")

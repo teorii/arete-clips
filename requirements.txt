@@ -7,14 +7,8 @@ jinja2==3.1.6
 httpx==0.28.1
 python-dotenv==1.1.1
 
-# Postgres (Supabase). Not needed while DATABASE_URL points at SQLite.
-psycopg[binary]==3.2.10
-
-# Cloudflare R2 / any S3-compatible object storage.
-boto3==1.40.30
-
-# Desktop shell. Renders through the WebView2 runtime built into Windows,
-# so there is no bundled browser.
+# Desktop shell. Renders through the WebView2 runtime built into Windows, so
+# there is no bundled browser.
 pywebview==6.2.1
 
 # Tray icon, so closing the window keeps the recorder running.
