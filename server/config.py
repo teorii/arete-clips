@@ -39,6 +39,15 @@ class Settings(BaseSettings):
     # MinIO addresses buckets by path, not subdomain. R2 accepts either, so
     # path style is the setting that works everywhere.
     s3_force_path_style: bool = True
+    # Where a locally managed MinIO keeps its data. Blank means a folder beside
+    # the rest of the app's files. Pointing this somewhere else is how an
+    # existing store is kept rather than silently replaced by an empty one.
+    minio_data_dir: str = ""
+
+    # Lets someone create their own account, so a new machine needs one shared
+    # string rather than a key issued by hand. Blank disables registration,
+    # which is the right default for a server nobody else should join.
+    invite_code: str = ""
 
     # Signs local dev upload tokens. Irrelevant once STORAGE_BACKEND=r2.
     upload_secret: str = "dev-only-change-me"

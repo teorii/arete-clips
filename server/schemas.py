@@ -62,6 +62,20 @@ class ClipOut(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class RegisterRequest(BaseModel):
+    handle: str = Field(min_length=1, max_length=64)
+    invite: str = Field(default="")
+
+    model_config = {"populate_by_name": True}
+
+
+class RegisterOut(BaseModel):
+    handle: str
+    api_key: str = Field(serialization_alias="apiKey")
+
+    model_config = {"populate_by_name": True}
+
+
 class ClipTrim(BaseModel):
     """A cut, in milliseconds from the start of the clip.
 

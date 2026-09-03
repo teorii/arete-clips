@@ -31,3 +31,22 @@ def test_a_name_is_always_produced():
 def test_the_app_never_names_a_clip_after_itself():
     for name in ("arete.exe", "explorer.exe", "python.exe"):
         assert name in _NOT_A_GAME
+
+
+def test_a_hosting_install_counts_as_configured(tmp_path, monkeypatch):
+    """Regression: solo setup writes no key, because the app creates the
+    account on first start. Requiring a key sent those installs back to setup
+    on every launch."""
+    import paths
+
+    config = tmp_path / "config.env"
+    monkeypatch.setattr(paths, "config_file", lambda: config)
+
+    config.write_text("API_BASE_URL=http://localhost:8000\nARETE_API_KEY=\n", encoding="utf-8")
+    assert paths.is_configured() is False, "no marker should mean not set up"
+
+    config.write_text(
+        "API_BASE_URL=http://localhost:8000\nARETE_API_KEY=\nSETUP_COMPLETE=1\n",
+        encoding="utf-8",
+    )
+    assert paths.is_configured() is True, "a hosting install must count as configured"

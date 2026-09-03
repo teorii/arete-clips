@@ -56,14 +56,20 @@ def write_config(values: dict[str, object]) -> Path:
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
 
     seconds = int(values["seconds"])
+    # Hosting points at this machine. The account and its key are created by the
+    # app on first start, so there is nothing for anyone to be given or type.
+    hosting = str(values.get("mode", "solo")) == "solo"
     updates = {
-        "API_BASE_URL": str(values["url"]).rstrip("/"),
-        "ARETE_API_KEY": str(values["key"]).strip(),
+        "API_BASE_URL": "http://localhost:8000" if hosting else str(values["url"]).rstrip("/"),
+        "ARETE_API_KEY": "" if hosting else str(values["key"]).strip(),
         "DDAGRAB_OUTPUT_IDX": str(int(values["display"])),
         "CLIP_SECONDS": str(seconds),
         # Enough headroom that a clip is never cut short by the ring wrapping.
         "BUFFER_SECONDS": str(max(60, seconds * 2)),
         "HOTKEY_VK": str(values.get("hotkey", "0x78")),
+        # What tells the app not to ask again. Hosting installs have no key at
+        # this point, so a key cannot be the signal.
+        "SETUP_COMPLETE": "1",
     }
 
     text = existing
@@ -193,6 +199,45 @@ class SetupApi(AppBridge):
         from capture.probe import check_api
 
         return check_api(url, key)
+
+    def join(self, url: str, invite: str, handle: str) -> dict:
+        """Create an account on the host and keep the key it returns.
+
+        This is what makes a new machine need one shared code rather than a key
+        someone had to issue by hand and send over.
+        """
+        import httpx
+
+        base = (url or "").strip().rstrip("/")
+        if not base:
+            return {"ok": False, "message": "Enter the server address."}
+        if not base.startswith(("http://", "https://")):
+            base = f"https://{base}"
+        if not handle.strip():
+            return {"ok": False, "message": "Pick a name for yourself."}
+
+        try:
+            response = httpx.post(
+                f"{base}/api/register",
+                json={"handle": handle.strip(), "invite": invite.strip()},
+                timeout=20.0,
+            )
+        except httpx.HTTPError as exc:
+            return {"ok": False, "message": f"Cannot reach {base}. {type(exc).__name__}."}
+
+        if response.status_code == 403:
+            return {"ok": False, "message": "That invite code was not accepted."}
+        if response.status_code == 409:
+            return {"ok": False, "message": "That name is taken on this server."}
+        if response.status_code != 200:
+            return {"ok": False, "message": f"Server said {response.status_code}."}
+
+        return {
+            "ok": True,
+            "message": "Joined.",
+            "base_url": base,
+            "key": response.json()["apiKey"],
+        }
 
     def save(self, values: dict) -> dict:
         try:

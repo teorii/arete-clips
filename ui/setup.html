@@ -52,14 +52,28 @@
   </section>
 
   <section>
-    <h2>2. Where your clips go</h2>
+    <h2>2. Where your clips live</h2>
+    <label for="mode">Storage</label>
+    <select id="mode">
+      <option value="solo" selected>On this PC (nothing else needed)</option>
+      <option value="join">On someone else's server</option>
+    </select>
+    <div id="soloNote" class="hint">
+      Clips stay on this machine and this app serves the share links, so a link
+      works while the app is running.
+    </div>
+    <div id="joinFields">
     <label for="url">Server address</label>
     <input id="url" placeholder="https://clips.example.com" autocomplete="off" spellcheck="false">
-    <label for="key">Your key</label>
-    <input id="key" placeholder="arete_…" autocomplete="off" spellcheck="false">
+    <label for="invite">Invite code</label>
+    <input id="invite" placeholder="from whoever runs the server" autocomplete="off" spellcheck="false">
+    <label for="handle">Your name</label>
+    <input id="handle" placeholder="what your clips are filed under" autocomplete="off" spellcheck="false">
+    <input id="key" type="hidden">
     <div class="row">
-      <button id="test">Test connection</button>
-      <span id="conn" class="status dim">Not tested yet.</span>
+      <button id="test">Join</button>
+      <span id="conn" class="status dim">Not connected yet.</span>
+    </div>
     </div>
   </section>
 
@@ -99,9 +113,20 @@
   const $ = (id) => document.getElementById(id);
   let encoderOk = false, connectionOk = false;
 
+  function solo() { return $('mode').value === 'solo'; }
+
   function refreshSave() {
-    $('save').disabled = !(encoderOk && connectionOk);
+    // Hosting needs nothing beyond the hardware checked: there is no server
+    // that could fail to answer.
+    $('save').disabled = !(encoderOk && (solo() || connectionOk));
   }
+
+  $('mode').onchange = () => {
+    const hosting = solo();
+    $('joinFields').style.display = hosting ? 'none' : '';
+    $('soloNote').style.display = hosting ? '' : 'none';
+    refreshSave();
+  };
 
   async function ready() {
     // pywebview injects its bridge asynchronously.
@@ -177,12 +202,23 @@
 
     // Already configured: the connection was working, so do not make someone
     // re-test it just to change which display they record.
+    // A non-local address means this machine already joined someone else.
+    if (now.url && !/localhost|127\.0\.0\.1/.test(now.url)) {
+      $('mode').value = 'join';
+      $('mode').onchange();
+    }
     if (now.url && now.key) {
       connectionOk = true;
       $('conn').className = 'status dim';
       $('conn').textContent = 'Using your saved connection.';
+      $('test').textContent = 'Re-check';
       $('save').textContent = 'Save';
       $('skip').textContent = 'Cancel';
+      // Already joined, so hide the fields that only matter the first time.
+      for (const id of ['invite', 'handle']) {
+        $(id).parentElement.querySelector(`label[for="${id}"]`)?.remove();
+        $(id).remove();
+      }
     }
     refreshSave();
   }
@@ -190,10 +226,15 @@
   $('test').onclick = async () => {
     $('test').disabled = true;
     $('conn').className = 'status dim';
-    $('conn').textContent = 'Checking…';
+    $('conn').textContent = 'Connecting…';
     let result;
     try {
-      result = await window.pywebview.api.test($('url').value, $('key').value);
+      // An existing key means this is a reconfigure, so check it rather than
+      // trying to create a second account under the same name.
+      result = $('key').value
+        ? await window.pywebview.api.test($('url').value, $('key').value)
+        : await window.pywebview.api.join(
+            $('url').value, $('invite').value, $('handle').value);
     } catch (err) {
       result = { ok: false, message: String(err) };
     }
@@ -201,6 +242,7 @@
     $('conn').className = 'status ' + (result.ok ? 'ok' : 'bad');
     $('conn').textContent = result.message;
     if (result.base_url) $('url').value = result.base_url;
+    if (result.key) $('key').value = result.key;
     $('test').disabled = false;
     refreshSave();
   };
@@ -212,6 +254,7 @@
     let result;
     try {
       result = await window.pywebview.api.save({
+        mode: $('mode').value,
         url: $('url').value,
         key: $('key').value,
         display: parseInt($('display').value, 10),
@@ -230,6 +273,8 @@
 
   $('skip').onclick = () => window.pywebview.api.skip();
 
+  // Hosting is the default, so the join fields start hidden.
+  $('mode').onchange();
   ready().then(probe);
 </script>
 </body>

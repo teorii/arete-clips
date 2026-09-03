@@ -266,6 +266,17 @@ class S3Storage(StorageBackend):
 _backend: StorageBackend | None = None
 
 
+def reset_storage() -> None:
+    """Forget the cached backend.
+
+    The addresses a backend was built with can change while the process runs:
+    opening a tunnel rewrites where clients are told to upload. Without this the
+    first backend built keeps signing URLs for the old address.
+    """
+    global _backend
+    _backend = None
+
+
 def get_storage() -> StorageBackend:
     global _backend
     if _backend is None:

@@ -43,12 +43,19 @@ def config_file() -> Path:
     return data_dir() / ("config.env" if is_frozen() else ".env")
 
 
+SETUP_MARKER = "SETUP_COMPLETE=1"
+
+
 def is_configured() -> bool:
-    """Whether setup has been completed on this machine."""
+    """Whether setup has been completed on this machine.
+
+    Keyed on an explicit marker rather than on a key being present: a machine
+    that hosts its own clips has no key at setup time, because the app creates
+    the account on first start. Testing for a key sent those installs back to
+    setup forever.
+    """
     path = config_file()
     if not path.exists():
         return False
     text = path.read_text(encoding="utf-8", errors="replace")
-    return "ARETE_API_KEY=" in text and not any(
-        line.strip() == "ARETE_API_KEY=" for line in text.splitlines()
-    )
+    return SETUP_MARKER in text

@@ -8,6 +8,7 @@ only ever moves metadata.
 from __future__ import annotations
 
 import base64
+import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -23,7 +24,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_, select, tuple_
 from sqlalchemy.orm import Session
 
-from .auth import require_user
+from .auth import generate_key, hash_key, require_user
 from .config import get_settings
 from .db import get_db
 from .ids import public_slug, uuid7
@@ -46,6 +47,8 @@ from .schemas import (
     ClipPage,
     ClipPatch,
     ClipTrim,
+    RegisterOut,
+    RegisterRequest,
     RenditionOut,
     UploadTargetOut,
 )
@@ -145,6 +148,36 @@ def _clip_out(clip: Clip) -> ClipOut:
 
 
 # ---------------------------------------------------------------- write path
+
+
+@app.post("/api/register", response_model=RegisterOut, response_model_by_alias=True)
+def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> RegisterOut:
+    """Create an account and hand back its key.
+
+    Exists so a new machine needs one shared invite code rather than a key
+    issued by hand on the host. Libraries are separate per user, so someone
+    joining never sees anyone else's clips; what they do share is the host's
+    disk, which is why an invite code gates this at all.
+
+    Blank invite_code on the server means registration is closed.
+    """
+    expected = settings.invite_code.strip()
+    if not expected:
+        raise HTTPException(403, "this server is not accepting new accounts")
+    # compare_digest, so a wrong guess cannot be narrowed down by timing.
+    if not secrets.compare_digest(payload.invite.strip(), expected):
+        raise HTTPException(403, "that invite code is not right")
+
+    handle = payload.handle.strip()
+    if not handle:
+        raise HTTPException(422, "pick a name")
+    if db.scalar(select(User).where(User.handle == handle)):
+        raise HTTPException(409, f"the name {handle!r} is taken on this server")
+
+    key = generate_key()
+    db.add(User(id=uuid7(), handle=handle, api_key_hash=hash_key(key)))
+    db.commit()
+    return RegisterOut(handle=handle, api_key=key)
 
 
 @app.post("/api/clips", response_model=ClipCreateOut, response_model_by_alias=True)

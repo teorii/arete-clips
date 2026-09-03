@@ -233,7 +233,22 @@ Three local processes, no third-party accounts.
 | Object storage | MinIO on 127.0.0.1:9000, bucket `clips` |
 | App | `Arete.bat` |
 
-Start the first two before the app:
+The app starts storage and the tunnels itself, so the only thing to do by hand
+is Postgres, which is a Windows service and needs an elevated shell:
+
+```
+net start postgresql-x64-18
+```
+
+`MANAGE_STORAGE` and `MANAGE_TUNNEL` in the config turn each off. Turning off
+the tunnel is worth considering: a quick tunnel gets a new public hostname on
+every launch, so links from a previous session stop working.
+
+Storage is adopted rather than restarted if something is already serving on its
+port, so running the app beside a terminal copy does not produce two processes
+fighting over one data directory. `MINIO_DATA_DIR` points at an existing store.
+
+To run the pieces by hand instead:
 
 ```
 net start postgresql-x64-18        (needs an admin shell)

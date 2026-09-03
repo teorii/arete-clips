@@ -47,7 +47,11 @@ Requires ffmpeg on PATH (or installed via winget) and an NVENC-capable GPU.
 
 Self-hosted, no SaaS. Postgres on 5432 (`arete`), MinIO on 9000 (bucket
 `clips`), app on 8000. `desktop.py` preflights both and names whichever is
-down. `scripts\start-storage.bat` starts MinIO; Postgres is a Windows service.
+down. The host starts MinIO and the tunnels itself (`services.py`), adopting anything
+already running rather than duplicating it. Postgres stays manual because
+starting a service needs elevation. Order matters at startup: tunnels rewrite
+the public addresses, so they must run before any server module imports and
+caches settings, which is why `host_flag` reads the config file directly.
 
 `server/models.py` is the schema source of truth and `server/migrate.py` builds
 it. `sql/001_init.sql` is a reference that records reasoning, not something that

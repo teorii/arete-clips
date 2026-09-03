@@ -49,6 +49,7 @@ from branding import APP_ID, APP_NAME  # noqa: E402
 from capture.daemon import Daemon  # noqa: E402
 from capture.hotkey import pump, stop as hotkey_stop  # noqa: E402
 from paths import bundle_dir, config_file, is_configured  # noqa: E402
+from services import StorageServer, Tunnels, update_config  # noqa: E402
 from setup import SetupApi, setup_page  # noqa: E402
 from tray import Tray  # noqa: E402
 
@@ -64,6 +65,64 @@ PORT = int(os.environ.get("PORT", "8000"))
 UI_HOST = "127.0.0.1" if HOST in {"0.0.0.0", "::"} else HOST
 DIST = bundle_dir() / "frontend" / "dist"
 ICON_PATH = bundle_dir() / "assets" / "arete.ico"
+
+
+def ensure_local_account() -> None:
+    """Give this machine an account on its own server, if it has none.
+
+    A solo install hosts its own clips, so needing a key from someone would be
+    absurd. Existing users are never touched: only the hash of a key is stored,
+    so an account cannot be handed back its key, and rotating someone else's on
+    a host others have joined would lock them out.
+    """
+    from sqlalchemy import select
+
+    from server.auth import generate_key, hash_key
+    from server.db import SessionLocal
+    from server.ids import uuid7
+    from server.migrate import ensure_schema
+    from server.models import User
+
+    if capture_config().arete_api_key.strip():
+        return
+
+    ensure_schema()
+    session = SessionLocal()
+    try:
+        taken = {handle for handle in session.scalars(select(User.handle)).all()}
+        handle = "me"
+        suffix = 2
+        while handle in taken:
+            handle = f"me-{suffix}"
+            suffix += 1
+        key = generate_key()
+        session.add(User(id=uuid7(), handle=handle, api_key_hash=hash_key(key)))
+        session.commit()
+    finally:
+        session.close()
+
+    update_config(ARETE_API_KEY=key)
+    print(f"  created a local account ({handle}) for this machine")
+
+
+def host_flag(name: str, default: bool) -> bool:
+    """Read a host switch straight from the config file.
+
+    Deliberately not through either settings class: these decide what happens
+    before any server module is imported, and importing one early would cache
+    settings that the tunnels are about to rewrite.
+    """
+    value = os.environ.get(name)
+    if value is None:
+        path = config_file()
+        if path.exists():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if line.strip().startswith(f"{name}="):
+                    value = line.split("=", 1)[1].strip()
+                    break
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def capture_config():
@@ -198,8 +257,15 @@ class ApiServer:
     """
 
     def __init__(self, verbose: bool = False) -> None:
+        # Imported here, not at module load, for two reasons. Ordering: the
+        # tunnels rewrite the public addresses this module reads at import.
+        # Packaging: naming it as the string "server.main:app" hid it from
+        # PyInstaller's analysis, so the module was never bundled and the
+        # packaged app failed with "Could not import module".
+        from server.main import app as asgi_app
+
         config = uvicorn.Config(
-            "server.main:app",
+            asgi_app,
             host=HOST,
             port=PORT,
             log_level="info" if verbose else "warning",
@@ -423,6 +489,8 @@ def main() -> int:
     claim_taskbar_identity()
 
     api: ApiServer | None = None
+    storage: StorageServer | None = None
+    tunnels: Tunnels | None = None
     configured = is_configured()
 
     def start_backend() -> bool:
@@ -440,7 +508,8 @@ def main() -> int:
         return check_client()
 
     def start_host() -> bool:
-        nonlocal api
+        nonlocal api, storage, tunnels
+
         if not DIST.is_dir():
             print("frontend/dist is missing. Build it:  cd frontend && npm run build")
             return False
@@ -450,11 +519,77 @@ def main() -> int:
                 "started from a terminal is probably still running."
             )
             return False
+
+        ensure_local_account()
+
+        # A code to hand out, so a new machine needs one string rather than a
+        # key issued by hand. Generated once and kept, because changing it
+        # would silently stop anyone mid-setup.
+        from server.config import Settings as _Settings
+
+        if not _Settings().invite_code.strip():
+            from server.auth import generate_key
+
+            update_config(INVITE_CODE=generate_key().replace("arete_", "join_")[:20])
+
+        # Storage first: the API hands out upload URLs pointing at it, and the
+        # tunnel that publishes it has to have something to publish.
+        if host_flag("MANAGE_STORAGE", True):
+            from server.config import Settings
+
+            settings = Settings()
+            storage = StorageServer(
+                settings.s3_access_key_id,
+                settings.s3_secret_access_key,
+                directory=settings.minio_data_dir or None,
+            )
+            if settings.storage_backend in {"s3", "r2"} and settings.s3_endpoint_url:
+                print("Starting object storage...")
+                if storage.start():
+                    print(f"  storage ready{' (already running)' if storage.adopted else ''}")
+                else:
+                    print("  storage did not start; clips will fail to upload")
+
+        # Tunnels before the API, because they rewrite the public addresses the
+        # API bakes into every share page and upload URL when it imports.
+        if host_flag("MANAGE_TUNNEL", True):
+            print("Opening tunnels...")
+            tunnels = Tunnels(api_port=PORT)
+            addresses = tunnels.start()
+            if addresses:
+                print(f"  public address: {addresses[0]}")
+            else:
+                print("  no tunnel; links will only work on this machine")
+
+        # The addresses just changed, so anything built from the old ones is
+        # wrong. Rebuild, then make sure the bucket exists and is readable.
+        if host_flag("MANAGE_STORAGE", True):
+            from server.config import get_settings
+            from server.storage import S3Storage, get_storage, reset_storage
+
+            get_settings.cache_clear()
+            reset_storage()
+            try:
+                backend = get_storage()
+                if isinstance(backend, S3Storage):
+                    backend.ensure_bucket(public_read=True)
+            except Exception as exc:  # noqa: BLE001
+                print(f"  could not prepare the bucket: {exc}")
+
         api = ApiServer(verbose=args.verbose)
         api.start()
         if not wait_for_health():
             print(f"The API did not come up on port {PORT}. See {LOG_PATH}.")
             return False
+
+        from server.config import Settings as _Fresh
+
+        current = _Fresh()
+        print()
+        print("To add another machine, give it these two things:")
+        print(f"  server : {current.public_base_url}")
+        print(f"  invite : {current.invite_code}")
+        print()
         return True
 
     def check_client() -> bool:
@@ -648,6 +783,11 @@ def main() -> int:
         services["capture"].stop()
         if api is not None:
             api.stop()
+        # Reverse order: stop publishing before removing what was published.
+        if tunnels is not None:
+            tunnels.stop()
+        if storage is not None:
+            storage.stop()
     return 0
 
 
