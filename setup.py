@@ -47,6 +47,17 @@ def setup_page() -> str:
     return str(bundle_dir() / "ui" / "setup.html")
 
 
+def settings_page() -> str:
+    """Changing settings is not first-run setup, and does not read like it.
+
+    Setup asks where clips should live and whether the machine can encode at
+    all, questions with one answer per install. Settings changes what is
+    already working, so it drops the numbered steps, the hardware check and the
+    option to skip, none of which mean anything on the second visit.
+    """
+    return str(bundle_dir() / "ui" / "settings.html")
+
+
 def write_config(values: dict[str, object]) -> Path:
     """Merge settings into the config file, leaving anything else alone.
 
@@ -73,6 +84,10 @@ def write_config(values: dict[str, object]) -> Path:
         # this point, so a key cannot be the signal.
         "SETUP_COMPLETE": "1",
     }
+    # Only when the page offers it. Setup does not ask, so its save must not
+    # write a default over whatever the config already says.
+    if values.get("bitrate"):
+        updates["CAPTURE_BITRATE"] = str(values["bitrate"])
 
     text = existing
     for key, value in updates.items():
@@ -96,9 +111,17 @@ class AppBridge:
     to reach the client, not the API.
     """
 
-    def __init__(self, uploader_factory=None, open_settings=None):
+    def __init__(self, uploader_factory=None, open_settings=None, close_settings=None):
         self._uploader_factory = uploader_factory
         self._open_settings = open_settings
+        self._close_settings = close_settings
+
+    def close_settings(self) -> dict:
+        """Leave settings without saving. Not the same as skipping setup."""
+        if self._close_settings is None:
+            return {"ok": False, "message": "nothing to return to"}
+        self._close_settings()
+        return {"ok": True}
 
     def open_settings(self) -> dict:
         """Show the settings screen.
@@ -191,8 +214,9 @@ class SetupApi(AppBridge):
         on_skipped: Callable[[], None],
         uploader_factory=None,
         open_settings=None,
+        close_settings=None,
     ):
-        super().__init__(uploader_factory, open_settings)
+        super().__init__(uploader_factory, open_settings, close_settings)
         self._on_saved = on_saved
         self._on_skipped = on_skipped
         self.saved = False
@@ -229,6 +253,29 @@ class SetupApi(AppBridge):
             "display": settings.ddagrab_output_idx,
             "seconds": settings.clip_seconds,
             "hotkey": f"0x{settings.hotkey_vk:02X}",
+            "bitrate": settings.capture_bitrate,
+        }
+
+    def install_info(self) -> dict:
+        """What this install is, for a screen that is not asking to change it.
+
+        The invite code is the reason this exists: it was printed at startup,
+        and the packaged app is built without a console, so the one string
+        needed to add a second machine was written where nobody could read it.
+        """
+        from paths import data_dir
+        from server.config import get_settings
+
+        get_settings.cache_clear()
+        settings = get_settings()
+        now = self.current()
+        hosting = bool(re.search(r"localhost|127\.0\.0\.1", now["url"]))
+        return {
+            "hosting": hosting,
+            "server": now["url"],
+            "public": settings.public_base_url,
+            "invite": settings.invite_code if hosting else "",
+            "folder": str(data_dir()),
         }
 
     def test(self, url: str, key: str) -> dict:

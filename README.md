@@ -206,8 +206,10 @@ to lane stop existing.
   already shaped around upload targets so multipart drops in.
 - **Lazy transcode.** One rendition on ingest, which is correct. The rest should
   be generated on first playback, since most clips are never watched.
-- **Auth.** Every clip belongs to one hardcoded owner id, so the manager app
-  trusts whoever opens it.
+- **Anything past the API key.** A key identifies a machine and libraries are
+  separate because of it, but there is no password, no way to revoke a key
+  short of editing the database, and a share link is public to whoever holds
+  it. Per-clip visibility is unbuilt.
 - **Proxy-first upload.** Encode a small 480p proxy, upload it first so the link
   is live in seconds, then send the source in the background throttled to a
   fraction of measured uplink while a game is in the foreground.

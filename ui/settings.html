@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Arete settings</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <h1>Settings</h1>
+  <div class="sub">Arete keeps recording while this is open. Changing anything
+    under Recording restarts the capture when you save.</div>
+
+  <section>
+    <h2>Recording</h2>
+    <label for="display">Source</label>
+    <select id="display"><option>Reading&hellip;</option></select>
+    <div class="hint">Recording is per display, so a program only names the
+      display it is on.</div>
+
+    <label for="seconds">Clip length</label>
+    <select id="seconds">
+      <option value="15">15 seconds</option>
+      <option value="30">30 seconds</option>
+      <option value="60">60 seconds</option>
+      <option value="90">90 seconds</option>
+      <option value="120">2 minutes</option>
+    </select>
+
+    <label for="hotkey">Hotkey</label>
+    <select id="hotkey">
+      <option value="0x75">F6</option>
+      <option value="0x76">F7</option>
+      <option value="0x77">F8</option>
+      <option value="0x78">F9</option>
+      <option value="0x79">F10</option>
+      <option value="0x7A">F11</option>
+      <option value="0x7B">F12</option>
+    </select>
+
+    <label for="bitrate">Quality</label>
+    <select id="bitrate">
+      <option value="6M">Smaller files (6 Mbps)</option>
+      <option value="12M">Balanced (12 Mbps)</option>
+      <option value="20M">Sharper (20 Mbps)</option>
+      <option value="30M">Highest (30 Mbps)</option>
+    </select>
+    <div class="hint">A longer clip at higher quality is more to upload before
+      the link exists.</div>
+  </section>
+
+  <section>
+    <h2>Behaviour</h2>
+    <label class="check-row"><input type="checkbox" id="play_sound">
+      <span>Play a sound when a clip is kept
+        <em>Confirms the hotkey worked without leaving the game.</em></span></label>
+    <label class="check-row"><input type="checkbox" id="show_notifications">
+      <span>Show a notification when a link is ready</span></label>
+    <label class="check-row"><input type="checkbox" id="quit_on_close">
+      <span>Fully close when pressing X
+        <em>Off hides the window to the tray, and recording continues.</em></span></label>
+    <label class="check-row"><input type="checkbox" id="copy_link_automatically">
+      <span>Copy a link to the clipboard as soon as it is made</span></label>
+    <label class="check-row"><input type="checkbox" id="confirm_delete">
+      <span>Ask before deleting a clip</span></label>
+    <label for="held_warning_gb">Warn when clips without links pass</label>
+    <select id="held_warning_gb">
+      <option value="1">1 GB</option>
+      <option value="2">2 GB</option>
+      <option value="5">5 GB</option>
+      <option value="10">10 GB</option>
+    </select>
+  </section>
+
+  <section>
+    <h2>This install</h2>
+    <div id="install" class="dim">Reading&hellip;</div>
+  </section>
+
+  <div class="foot">
+    <button id="save" class="primary" disabled>Save changes</button>
+    <button id="cancel">Cancel</button>
+    <span id="status" class="status dim"></span>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const CONFIG = ['display', 'seconds', 'hotkey', 'bitrate'];
+  const CHECKS = ['play_sound', 'show_notifications', 'quit_on_close',
+                  'copy_link_automatically', 'confirm_delete'];
+
+  // What is on disk. Save stays off until something differs from it, so the
+  // button never offers to restart capture for no change.
+  let saved = {};
+  // Where clips live is a setup decision, carried through here untouched.
+  let connection = {};
+
+  function ready() {
+    return new Promise((resolve) => {
+      if (window.pywebview && window.pywebview.api) return resolve();
+      window.addEventListener('pywebviewready', resolve, { once: true });
+    });
+  }
+
+  function snapshot() {
+    const now = {};
+    for (const id of CONFIG) now[id] = $(id).value;
+    now.held_warning_gb = $('held_warning_gb').value;
+    for (const id of CHECKS) now[id] = $(id).checked;
+    return now;
+  }
+
+  function refreshSave() {
+    const now = snapshot();
+    const changed = Object.keys(now).some((key) => now[key] !== saved[key]);
+    $('save').disabled = !changed;
+    if (!changed) $('status').textContent = '';
+  }
+
+  function describe(install) {
+    const where = install.hosting
+      ? 'This machine hosts its own clips.'
+      : 'Clips go to ' + install.server + '.';
+    let html =
+      '<div class="check"><b>Clips</b> <span>' + where + '</span></div>' +
+      '<div class="check"><b>Folder</b> <code>' + install.folder + '</code></div>';
+    if (install.invite) {
+      html +=
+        '<div class="check"><b>Address</b> <code>' + install.public + '</code></div>' +
+        '<div class="check"><b>Invite</b> <code>' + install.invite + '</code></div>' +
+        '<div class="hint">Another machine needs those two to join this ' +
+        'library. A new address is issued each time Arete starts.</div>';
+    }
+    return html;
+  }
+
+  async function load() {
+    const [info, prefs, install] = await Promise.all([
+      window.pywebview.api.probe(),
+      window.pywebview.api.preferences(),
+      window.pywebview.api.install_info(),
+    ]);
+
+    const source = $('display');
+    source.innerHTML = '';
+    for (const display of info.displays) {
+      const option = document.createElement('option');
+      option.value = String(display.index);
+      option.textContent = display.label;
+      source.appendChild(option);
+    }
+
+    connection = {
+      mode: install.hosting ? 'solo' : 'join',
+      url: install.server,
+      key: info.current.key,
+    };
+    $('display').value = String(info.current.display);
+    $('seconds').value = String(info.current.seconds);
+    $('hotkey').value = info.current.hotkey;
+    $('bitrate').value = info.current.bitrate;
+
+    for (const id of CHECKS) $(id).checked = prefs[id] === true;
+    $('held_warning_gb').value = String(
+      prefs.held_warning_gb === undefined ? 2 : prefs.held_warning_gb);
+
+    $('install').innerHTML = describe(install);
+    $('install').className = '';
+
+    saved = snapshot();
+    refreshSave();
+  }
+
+  for (const id of CONFIG.concat(CHECKS, ['held_warning_gb'])) {
+    $(id).addEventListener('change', refreshSave);
+  }
+
+  $('save').onclick = async () => {
+    $('save').disabled = true;
+    $('status').className = 'status dim';
+    $('status').textContent = 'Saving...';
+    let result;
+    try {
+      // Preferences are their own file and apply as soon as they are written,
+      // so they go first and survive a config write that is refused.
+      await window.pywebview.api.save_preferences({
+        play_sound: $('play_sound').checked,
+        show_notifications: $('show_notifications').checked,
+        quit_on_close: $('quit_on_close').checked,
+        copy_link_automatically: $('copy_link_automatically').checked,
+        confirm_delete: $('confirm_delete').checked,
+        held_warning_gb: parseFloat($('held_warning_gb').value),
+      });
+      result = await window.pywebview.api.save({
+        mode: connection.mode,
+        url: connection.url,
+        key: connection.key,
+        display: parseInt($('display').value, 10),
+        seconds: parseInt($('seconds').value, 10),
+        hotkey: $('hotkey').value,
+        bitrate: $('bitrate').value,
+      });
+    } catch (err) {
+      result = { ok: false, message: String(err) };
+    }
+    // A save navigates back to the library, so only a refusal stays here.
+    if (!result.ok) {
+      $('status').className = 'status bad';
+      $('status').textContent = result.message;
+      $('save').disabled = false;
+    }
+  };
+
+  $('cancel').onclick = () => window.pywebview.api.close_settings();
+
+  ready().then(load);
+</script>
+</body>
+</html>

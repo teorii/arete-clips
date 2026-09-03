@@ -47,10 +47,13 @@ import webview  # noqa: E402
 
 from branding import APP_ID, APP_NAME  # noqa: E402
 from capture.daemon import Daemon  # noqa: E402
+from child_processes import die_with_us  # noqa: E402
 from capture.hotkey import pump, stop as hotkey_stop  # noqa: E402
 from paths import bundle_dir, config_file, is_configured  # noqa: E402
+from problems import warn  # noqa: E402
 from services import Tunnels, update_config  # noqa: E402
-from setup import SetupApi, setup_page  # noqa: E402
+from setup import SetupApi, settings_page, setup_page  # noqa: E402
+from single_instance import claim as claim_single_instance  # noqa: E402
 from tray import Tray  # noqa: E402
 
 # Loopback by default. Setting BIND_HOST=0.0.0.0 makes share links work for
@@ -484,6 +487,23 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    # Before anything is opened. A second copy otherwise dies on whichever
+    # resource it reaches first, the ring buffer or the port, and a traceback
+    # reads like a broken app rather than one that is already running.
+    if not claim_single_instance():
+        print(f"{APP_NAME} is already running. Bringing its window forward.")
+        return 0
+
+    # ffmpeg and cloudflared run as long as the app does. Without this they
+    # survive it being killed, and the orphaned encoder holds the ring buffer
+    # that the next launch needs.
+    if not die_with_us():
+        warn(
+            "process cleanup",
+            "could not create a job object",
+            "ffmpeg may keep running if the app is killed",
+        )
+
     # Packaged, these are the answers to most "where did it put that" and
     # "why is it not reading my settings" questions, and they cost one line.
     print(f"{APP_NAME} starting")
@@ -639,7 +659,7 @@ def main() -> int:
         window.load_url(app_url())
 
     def open_settings() -> None:
-        window.load_url(setup_page())
+        window.load_url(settings_page())
         window.show()
         window.restore()
 
@@ -650,6 +670,9 @@ def main() -> int:
         # change, and its uploader with it.
         uploader_factory=lambda: services["capture"].daemon.uploader,
         open_settings=lambda: open_settings(),
+        # Leaving settings goes back to the library. Setup's skip abandons a
+        # machine that is not configured yet, which is a different thing.
+        close_settings=lambda: window.load_url(app_url()),
     )
 
     if configured:

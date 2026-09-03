@@ -1,5 +1,6 @@
 # secrets
 .env
+.env.backup*
 
 # python
 __pycache__/
@@ -43,3 +44,7 @@ arete.log
 *.wav
 storage/
 *.db.backup-*
+
+# agent instructions: local to whoever is working on this, not part of the app
+CLAUDE.md
+.claude/
