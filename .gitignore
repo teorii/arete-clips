@@ -1,0 +1,27 @@
+# secrets
+.env
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# node
+node_modules/
+frontend/dist/
+
+# local data: clips, the rolling buffer, the dev database
+clips_local/
+clips_out/
+ringbuf/
+*.db
+*.sqlite3
+
+# build artifacts
+build/
+dist/
+*.spec

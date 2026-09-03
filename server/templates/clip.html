@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ clip.title or "League clip" }}</title>
+
+{# Open Graph: this is what makes the link unfurl into an inline player. #}
+<meta property="og:site_name" content="Clipper">
+<meta property="og:title" content="{{ clip.title or 'League of Legends clip' }}">
+<meta property="og:description" content="{{ duration_s }}s captured on {{ meta.get('encoder', 'GPU') }} at {{ width }}x{{ height }}">
+<meta property="og:url" content="{{ share_url }}">
+{% if video_url %}
+<meta property="og:type" content="video.other">
+<meta property="og:video" content="{{ video_url }}">
+<meta property="og:video:secure_url" content="{{ video_url }}">
+<meta property="og:video:type" content="video/mp4">
+<meta property="og:video:width" content="{{ width }}">
+<meta property="og:video:height" content="{{ height }}">
+<meta name="twitter:card" content="player">
+<meta name="twitter:player:stream" content="{{ video_url }}">
+<meta name="twitter:player:width" content="{{ width }}">
+<meta name="twitter:player:height" content="{{ height }}">
+{% endif %}
+{% if thumb_url %}
+<meta property="og:image" content="{{ thumb_url }}">
+<meta name="twitter:image" content="{{ thumb_url }}">
+{% endif %}
+<meta name="theme-color" content="#0d1117">
+
+<style>
+  :root {
+    --bg: #0b0e14; --panel: #141922; --line: #232b39;
+    --text: #e6edf3; --dim: #8b97a8; --accent: #4f9cf9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+    display: flex; justify-content: center; padding: 32px 20px 64px;
+  }
+  .wrap { width: 100%; max-width: 940px; }
+  a { color: var(--accent); }
+  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; }
+  header h1 { font-size: 20px; margin: 0; font-weight: 600; }
+  .home { margin-left: auto; color: var(--dim); text-decoration: none; font-size: 14px; }
+  .home:hover { color: var(--text); }
+  .player {
+    background: #000; border: 1px solid var(--line); border-radius: 12px;
+    overflow: hidden; aspect-ratio: {{ width }} / {{ height }};
+  }
+  video { width: 100%; height: 100%; display: block; }
+  .pending {
+    display: flex; align-items: center; justify-content: center; height: 100%;
+    color: var(--dim); font-size: 14px;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+  .chip {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+    padding: 5px 12px; font-size: 13px; color: var(--dim);
+  }
+  .chip b { color: var(--text); font-weight: 600; }
+  .share { display: flex; gap: 8px; margin-top: 18px; }
+  .share input {
+    flex: 1; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 12px; color: var(--text);
+    font-family: ui-monospace, "Cascadia Code", monospace; font-size: 13px;
+  }
+  .share button {
+    background: var(--accent); border: 0; border-radius: 8px; color: #04101f;
+    padding: 10px 18px; font-weight: 600; cursor: pointer; font-size: 14px;
+  }
+  .share button:hover { filter: brightness(1.1); }
+  details { margin-top: 26px; }
+  summary { cursor: pointer; color: var(--dim); font-size: 14px; }
+  table { border-collapse: collapse; margin-top: 12px; font-size: 13px; width: 100%; }
+  td { padding: 6px 14px 6px 0; border-bottom: 1px solid var(--line); color: var(--dim); }
+  td:first-child { color: var(--text); width: 190px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>{{ clip.title or "League clip" }}</h1>
+    <a class="home" href="/">library</a>
+  </header>
+
+  <div class="player">
+    {% if video_url %}
+      <video controls autoplay muted playsinline preload="metadata"
+             {% if thumb_url %}poster="{{ thumb_url }}"{% endif %}>
+        <source src="{{ video_url }}" type="video/mp4">
+      </video>
+    {% else %}
+      <div class="pending">Clip is {{ clip.status.value }}, no playable rendition yet.</div>
+    {% endif %}
+  </div>
+
+  <div class="chips">
+    <span class="chip"><b>{{ duration_s }}s</b></span>
+    <span class="chip"><b>{{ width }}x{{ height }}</b></span>
+    {% if meta.get('fps') %}<span class="chip"><b>{{ meta.get('fps') }}</b> fps</span>{% endif %}
+    {% if size_mb %}<span class="chip"><b>{{ size_mb }}</b> MB</span>{% endif %}
+    {% if meta.get('encoder') %}<span class="chip">{{ meta.get('encoder') }}</span>{% endif %}
+    <span class="chip"><b>{{ clip.view_count }}</b> views</span>
+  </div>
+
+  <div class="share">
+    <input id="link" value="{{ share_url }}" readonly>
+    <button onclick="copyLink()">Copy link</button>
+  </div>
+
+  <details>
+    <summary>Capture metadata</summary>
+    <table>
+      <tr><td>Captured at</td><td>{{ captured_at }}</td></tr>
+      <tr><td>Uploaded at</td><td>{{ uploaded_at or "not uploaded" }}</td></tr>
+      <tr><td>Trigger</td><td>{{ clip.trigger_type.value }}</td></tr>
+      <tr><td>Status</td><td>{{ clip.status.value }}</td></tr>
+      {% for k, v in meta.items() %}
+      <tr><td>{{ k }}</td><td>{{ v }}</td></tr>
+      {% endfor %}
+    </table>
+  </details>
+</div>
+
+<script>
+function copyLink() {
+  const el = document.getElementById("link");
+  navigator.clipboard.writeText(el.value).then(() => {
+    const btn = document.querySelector(".share button");
+    const old = btn.textContent;
+    btn.textContent = "Copied";
+    setTimeout(() => { btn.textContent = old; }, 1200);
+  });
+}
+</script>
+</body>
+</html>

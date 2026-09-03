@@ -1,0 +1,364 @@
+<title>The Whiteboard Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  --paper:#EFF2F5; --surface:#FFFFFF; --surface-2:#E3E9EF;
+  --ink:#131920; --ink-2:#4A5563; --ink-3:#78838F;
+  --rule:#CBD3DC; --rule-soft:#DDE3EA;
+  --signal:#9A5B06; --signal-bg:#FBF0DC;
+  --probe:#0B6E82; --probe-bg:#DEEDF1;
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --s--1:0.8125rem; --s-0:1.0625rem; --s-1:1.1875rem; --s-3:1.875rem; --s-4:2.5rem;
+  --col:68ch; --wide:64rem;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0E1319; --surface:#171F27; --surface-2:#1F2A34;
+  --ink:#E4EAF0; --ink-2:#A5B1BE; --ink-3:#6F7C8A;
+  --rule:#2B3641; --rule-soft:#222C36;
+  --signal:#F0AE38; --signal-bg:#2A2113;
+  --probe:#3FC3DC; --probe-bg:#12262B;
+}}
+:root[data-theme="dark"]{
+  --paper:#0E1319; --surface:#171F27; --surface-2:#1F2A34;
+  --ink:#E4EAF0; --ink-2:#A5B1BE; --ink-3:#6F7C8A;
+  --rule:#2B3641; --rule-soft:#222C36;
+  --signal:#F0AE38; --signal-bg:#2A2113;
+  --probe:#3FC3DC; --probe-bg:#12262B;
+}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:var(--s-0);line-height:1.62;margin:0;padding:0 1.5rem 6rem;-webkit-font-smoothing:antialiased}
+.wrap{max-width:var(--wide);margin:0 auto;display:flex;flex-direction:column;gap:3.25rem}
+p,ul,ol{margin:0}
+a{color:var(--signal)}
+a:focus-visible{outline:2px solid var(--signal);outline-offset:3px;border-radius:2px}
+
+.masthead{padding-top:3.5rem;display:flex;flex-direction:column;gap:1.15rem;max-width:var(--col)}
+.eyebrow{font-family:var(--mono);font-size:var(--s--1);font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin:0}
+h1{font-family:var(--display);font-variation-settings:"wdth" 112;font-weight:700;font-size:clamp(2.25rem,6vw,var(--s-4));line-height:1.04;letter-spacing:-.015em;margin:0;text-wrap:balance}
+.deck{font-size:var(--s-1);color:var(--ink-2);line-height:1.55}
+
+section{display:flex;flex-direction:column;gap:1.5rem}
+.sec-head{display:flex;flex-direction:column;gap:.7rem}
+.ruler{height:11px;background-image:repeating-linear-gradient(to right,var(--rule) 0 1px,transparent 1px 14px);background-position:bottom left;background-repeat:repeat-x;border-bottom:1px solid var(--rule)}
+.sec-label{font-family:var(--mono);font-size:.75rem;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+h2{font-family:var(--display);font-variation-settings:"wdth" 108;font-weight:700;font-size:var(--s-3);line-height:1.12;letter-spacing:-.012em;margin:0;max-width:26ch;text-wrap:balance}
+h3{font-family:var(--display);font-variation-settings:"wdth" 100;font-weight:600;font-size:var(--s-1);line-height:1.25;margin:1rem 0 0}
+.stack{display:flex;flex-direction:column;gap:1rem;max-width:var(--col)}
+ul.tight,ol.tight{padding-left:1.2rem;display:flex;flex-direction:column;gap:.5rem}
+ul.tight li::marker{color:var(--signal)}
+ol.tight li::marker{color:var(--signal);font-family:var(--mono);font-size:.85em}
+code{font-family:var(--mono);font-size:.875em;background:var(--surface-2);padding:.08em .36em;border-radius:3px}
+strong{font-weight:600;color:var(--ink)}
+
+.callout{max-width:var(--col);padding:1.05rem 1.2rem;border-left:3px solid var(--signal);background:var(--signal-bg);display:flex;flex-direction:column;gap:.55rem;font-size:var(--s--1);line-height:1.6}
+.callout .tag{font-family:var(--mono);font-size:.7rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--signal)}
+.callout.probe{border-left-color:var(--probe);background:var(--probe-bg)}
+.callout.probe .tag{color:var(--probe)}
+
+figure{margin:0;display:flex;flex-direction:column;gap:.85rem;background:var(--surface);border:1px solid var(--rule);padding:1.5rem 1.25rem 1.25rem}
+.fig-scroll{overflow-x:auto}
+figure svg{display:block;width:100%;min-width:44rem;height:auto}
+figcaption{font-size:var(--s--1);color:var(--ink-2);line-height:1.55;max-width:64ch;border-top:1px solid var(--rule-soft);padding-top:.85rem}
+figcaption b{color:var(--ink)}
+
+.d-box{fill:var(--surface-2);stroke:var(--rule);stroke-width:1.25}
+.d-box-key{fill:var(--signal-bg);stroke:var(--signal);stroke-width:1.75}
+.d-box-probe{fill:var(--probe-bg);stroke:var(--probe);stroke-width:1.25;stroke-dasharray:5 3}
+.d-t{font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:12.5px;fill:var(--ink)}
+.d-t-b{font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:12.5px;font-weight:600;fill:var(--ink)}
+.d-sm{font-family:"IBM Plex Mono",monospace;font-size:10px;fill:var(--ink-3)}
+.d-lbl{font-family:"IBM Plex Mono",monospace;font-size:10px;fill:var(--ink-2)}
+.d-key{font-family:"IBM Plex Mono",monospace;font-size:10px;fill:var(--signal)}
+.d-line{stroke:var(--ink-3);stroke-width:1.4;fill:none}
+.d-line-key{stroke:var(--signal);stroke-width:2;fill:none}
+.d-line-probe{stroke:var(--probe);stroke-width:1.4;fill:none;stroke-dasharray:4 3}
+.d-arrow{fill:var(--ink-3)}
+.d-arrow-key{fill:var(--signal)}
+.d-arrow-probe{fill:var(--probe)}
+.d-badge{fill:var(--signal);stroke:none}
+.d-badge-t{font-family:"IBM Plex Mono",monospace;font-size:10px;font-weight:600;fill:var(--paper)}
+
+.er-body{fill:var(--surface-2);stroke:var(--rule);stroke-width:1.25}
+.er-head{fill:var(--signal-bg);stroke:var(--signal);stroke-width:1.5}
+.er-head-t{font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;fill:var(--ink)}
+.er-col{font-family:"IBM Plex Mono",monospace;font-size:10.5px;fill:var(--ink-2)}
+.er-col-k{font-family:"IBM Plex Mono",monospace;font-size:10.5px;fill:var(--ink);font-weight:500}
+.er-tag{font-family:"IBM Plex Mono",monospace;font-size:9px;fill:var(--signal);font-weight:600}
+.er-rel{stroke:var(--ink-3);stroke-width:1.4;fill:none}
+.er-card{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;fill:var(--ink-2)}
+.er-ghost{fill:none;stroke:var(--probe);stroke-width:1.4;stroke-dasharray:5 4}
+.er-ghost-t{font-family:"IBM Plex Mono",monospace;font-size:11px;fill:var(--probe)}
+
+.steps{max-width:var(--col);display:flex;flex-direction:column;gap:1px;background:var(--rule);border:1px solid var(--rule)}
+.step{background:var(--surface);padding:.7rem .95rem;display:grid;grid-template-columns:1.6rem 1fr;gap:.85rem;align-items:baseline;font-size:var(--s--1)}
+.step-n{font-family:var(--mono);font-size:.75rem;font-weight:600;color:var(--signal)}
+.step b{color:var(--ink)}
+.step .who{font-family:var(--mono);font-size:.72rem;color:var(--ink-3);display:block;margin-top:.15rem}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Drill sheet &nbsp;//&nbsp; draw these from memory</p>
+    <h1>The Whiteboard Sheet</h1>
+    <p class="deck">Two diagrams, built to be reproduced rather than admired. The target is both on a blank page in under four minutes without hesitating, because hesitating in front of an interviewer costs more than getting a box slightly wrong.</p>
+  </header>
+
+  <section id="system">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">01</p>
+      <h2>The system</h2>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 940 500" role="img" aria-label="Full architecture. The desktop client calls the API to create a clip record and receive presigned URLs, then uploads bytes directly to object storage. A storage event enqueues transcode work whose output returns to storage. Viewers read metadata from the API and video from a CDN backed by object storage. Client, transcode workers and viewers all emit events into a separate event pipeline.">
+          <defs>
+            <marker id="w-a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="d-arrow"></path></marker>
+            <marker id="w-k" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="d-arrow-key"></path></marker>
+            <marker id="w-p" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="d-arrow-probe"></path></marker>
+          </defs>
+
+          <rect x="20" y="110" width="190" height="180" rx="4" class="d-box-key"></rect>
+          <text x="115" y="134" class="d-t-b" text-anchor="middle">DESKTOP CLIENT</text>
+          <line x1="34" y1="144" x2="196" y2="144" class="d-line" opacity=".45"></line>
+          <text x="34" y="166" class="d-t">GPU capture + NVENC</text>
+          <text x="34" y="188" class="d-t">Ring buffer (disk-backed)</text>
+          <text x="34" y="210" class="d-t">Trim + 480p proxy</text>
+          <text x="34" y="232" class="d-t">Resumable uploader</text>
+          <text x="34" y="256" class="d-sm">the hard part lives here</text>
+
+          <rect x="270" y="40" width="170" height="60" rx="4" class="d-box"></rect>
+          <text x="355" y="66" class="d-t-b" text-anchor="middle">API service</text>
+          <text x="355" y="84" class="d-sm" text-anchor="middle">metadata only, never bytes</text>
+
+          <rect x="500" y="40" width="220" height="60" rx="4" class="d-box"></rect>
+          <text x="610" y="66" class="d-t-b" text-anchor="middle">Postgres</text>
+          <text x="610" y="84" class="d-sm" text-anchor="middle">clips, renditions, users, games</text>
+
+          <rect x="270" y="170" width="170" height="64" rx="4" class="d-box"></rect>
+          <text x="355" y="196" class="d-t-b" text-anchor="middle">Object storage</text>
+          <text x="355" y="215" class="d-sm" text-anchor="middle">source + renditions</text>
+
+          <rect x="500" y="170" width="170" height="64" rx="4" class="d-box"></rect>
+          <text x="585" y="196" class="d-t-b" text-anchor="middle">Job queue</text>
+          <text x="585" y="215" class="d-sm" text-anchor="middle">fresh over backfill</text>
+
+          <rect x="500" y="280" width="170" height="64" rx="4" class="d-box"></rect>
+          <text x="585" y="306" class="d-t-b" text-anchor="middle">Transcode workers</text>
+          <text x="585" y="325" class="d-sm" text-anchor="middle">lazy ladder, idempotent</text>
+
+          <rect x="750" y="170" width="170" height="64" rx="4" class="d-box"></rect>
+          <text x="835" y="196" class="d-t-b" text-anchor="middle">CDN</text>
+          <text x="835" y="215" class="d-sm" text-anchor="middle">signed URLs, edge cache</text>
+
+          <rect x="750" y="280" width="170" height="64" rx="4" class="d-box"></rect>
+          <text x="835" y="306" class="d-t-b" text-anchor="middle">Viewer</text>
+          <text x="835" y="325" class="d-sm" text-anchor="middle">also calls API (step 7)</text>
+
+          <rect x="270" y="400" width="650" height="60" rx="4" class="d-box-probe"></rect>
+          <text x="595" y="426" class="d-t-b" text-anchor="middle">Event pipeline</text>
+          <text x="595" y="445" class="d-sm" text-anchor="middle">collector, stream, warehouse, ranking + highlight training set</text>
+
+          <line x1="212" y1="152" x2="266" y2="94" class="d-line-key" marker-end="url(#w-k)"></line>
+          <circle cx="230" cy="112" r="9" class="d-badge"></circle>
+          <text x="230" y="116" class="d-badge-t" text-anchor="middle">1</text>
+
+          <line x1="440" y1="70" x2="496" y2="70" class="d-line" marker-end="url(#w-a)"></line>
+          <circle cx="468" cy="56" r="9" class="d-badge"></circle>
+          <text x="468" y="60" class="d-badge-t" text-anchor="middle">2</text>
+
+          <line x1="212" y1="202" x2="266" y2="202" class="d-line-key" marker-end="url(#w-k)"></line>
+          <circle cx="239" cy="184" r="9" class="d-badge"></circle>
+          <text x="239" y="188" class="d-badge-t" text-anchor="middle">3</text>
+
+          <line x1="440" y1="202" x2="496" y2="202" class="d-line" marker-end="url(#w-a)"></line>
+          <circle cx="468" cy="184" r="9" class="d-badge"></circle>
+          <text x="468" y="188" class="d-badge-t" text-anchor="middle">4</text>
+
+          <line x1="585" y1="234" x2="585" y2="276" class="d-line" marker-end="url(#w-a)"></line>
+          <circle cx="606" cy="255" r="9" class="d-badge"></circle>
+          <text x="606" y="259" class="d-badge-t" text-anchor="middle">5</text>
+
+          <path d="M500,312 L400,312 L400,238" class="d-line" marker-end="url(#w-a)"></path>
+          <circle cx="418" cy="292" r="9" class="d-badge"></circle>
+          <text x="418" y="296" class="d-badge-t" text-anchor="middle">6</text>
+
+          <line x1="835" y1="276" x2="835" y2="238" class="d-line" marker-end="url(#w-a)"></line>
+          <circle cx="857" cy="257" r="9" class="d-badge"></circle>
+          <text x="857" y="261" class="d-badge-t" text-anchor="middle">8</text>
+
+          <path d="M835,168 L835,142 L355,142 L355,166" class="d-line" marker-end="url(#w-a)"></path>
+          <circle cx="600" cy="142" r="9" class="d-badge"></circle>
+          <text x="600" y="146" class="d-badge-t" text-anchor="middle">9</text>
+          <text x="618" y="133" class="d-lbl">origin pull on cache miss</text>
+
+          <path d="M115,292 L115,430 L266,430" class="d-line-probe" marker-end="url(#w-p)"></path>
+          <line x1="585" y1="346" x2="585" y2="396" class="d-line-probe" marker-end="url(#w-p)"></line>
+          <line x1="835" y1="346" x2="835" y2="396" class="d-line-probe" marker-end="url(#w-p)"></line>
+          <text x="124" y="392" class="d-lbl">capture, trim, upload</text>
+          <text x="594" y="374" class="d-lbl">pipeline latency</text>
+          <text x="844" y="374" class="d-lbl">watch %</text>
+
+          <text x="20" y="486" class="d-sm">Amber marks the write path. Notice it forks: metadata to the API, bytes straight past it to storage.</text>
+        </svg>
+      </div>
+      <figcaption><b>The one thing this diagram is arguing.</b> The client's two arrows go to different places. Metadata goes to your API; bytes go around it. If you draw only one thing correctly under pressure, draw that fork, because it is the decision the whole design rests on and it is the piece you got tangled in during the mock.</figcaption>
+    </figure>
+
+    <div class="stack">
+      <h3>The sequence, in words</h3>
+      <p>Say these out loud while you draw. The numbers match the badges.</p>
+    </div>
+
+    <div class="steps">
+      <div class="step"><span class="step-n">1</span><div><b>Client calls <code>POST /clips</code>.</b> Sends metadata: game, duration, size. The API holds the session token, so this is the step that knows who the user is.<span class="who">client to API</span></div></div>
+      <div class="step"><span class="step-n">2</span><div><b>API inserts the clip row,</b> then mints presigned URLs with your cloud credentials and returns the clip id, public slug, and those URLs.<span class="who">API to Postgres, then back to client</span></div></div>
+      <div class="step"><span class="step-n">3</span><div><b>Client PUTs bytes straight to object storage.</b> 480p proxy first so the link is live in about four seconds, source following in the background, chunked and resumable. Then <code>POST /clips/:id/complete</code>.<span class="who">client to object storage</span></div></div>
+      <div class="step"><span class="step-n">4</span><div><b>Object storage emits an object-created event</b> onto the job queue. Nothing polls.<span class="who">object storage to queue</span></div></div>
+      <div class="step"><span class="step-n">5</span><div><b>A transcode worker picks up the job.</b> Fresh clips take priority over backfill.<span class="who">queue to workers</span></div></div>
+      <div class="step"><span class="step-n">6</span><div><b>Worker writes renditions back to storage</b> and updates the clip's status in Postgres. Idempotent on clip id, so a retry is safe.<span class="who">workers to storage and Postgres</span></div></div>
+      <div class="step"><span class="step-n">7</span><div><b>A viewer opens the link.</b> Their browser calls the API with the public slug. The API reads Postgres and returns metadata plus a CDN playback URL, signed if the clip is private.<span class="who">viewer to API</span></div></div>
+      <div class="step"><span class="step-n">8</span><div><b>The player requests video from the CDN,</b> never from your API and never from object storage directly.<span class="who">viewer to CDN</span></div></div>
+      <div class="step"><span class="step-n">9</span><div><b>On a cache miss the CDN pulls from object storage,</b> its origin, then serves everyone after that from the edge.<span class="who">CDN to object storage</span></div></div>
+    </div>
+
+    <div class="callout">
+      <span class="tag">Draw order on a real whiteboard</span>
+      <p>Client far left. API and Postgres along the top. Object storage directly right of the client. Queue and workers right of that. CDN and viewer far right. Event pipeline as one long box across the bottom, added last. <strong>Boxes first, arrows second.</strong> If you start with arrows the layout fights you and you will run out of room.</p>
+    </div>
+  </section>
+
+  <section id="schema">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">02</p>
+      <h2>The schema</h2>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 880 552" role="img" aria-label="Entity relationship diagram. Users and games each have many clips. Each clip has many renditions. Clip events are drawn outside the database, feeding the event pipeline.">
+          <defs>
+            <marker id="s-a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="d-arrow"></path></marker>
+            <marker id="s-p" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="d-arrow-probe"></path></marker>
+          </defs>
+
+          <rect x="30" y="86" width="200" height="80" rx="3" class="er-body"></rect>
+          <rect x="30" y="60" width="200" height="26" rx="3" class="er-head"></rect>
+          <text x="42" y="78" class="er-head-t">users</text>
+          <text x="42" y="102" class="er-col-k">id</text><text x="218" y="102" class="er-tag" text-anchor="end">PK</text>
+          <text x="42" y="122" class="er-col">handle</text>
+          <text x="42" y="142" class="er-col">tier</text>
+          <text x="42" y="162" class="er-col">storage_used_bytes</text>
+
+          <rect x="30" y="316" width="200" height="62" rx="3" class="er-body"></rect>
+          <rect x="30" y="290" width="200" height="26" rx="3" class="er-head"></rect>
+          <text x="42" y="308" class="er-head-t">games</text>
+          <text x="42" y="332" class="er-col-k">id</text><text x="218" y="332" class="er-tag" text-anchor="end">PK</text>
+          <text x="42" y="352" class="er-col">name</text>
+          <text x="42" y="372" class="er-col">exe_fingerprint</text>
+
+          <rect x="310" y="66" width="260" height="282" rx="3" class="er-body"></rect>
+          <rect x="310" y="40" width="260" height="26" rx="3" class="er-head"></rect>
+          <text x="322" y="58" class="er-head-t">clips</text>
+          <text x="322" y="82" class="er-col-k">id</text><text x="558" y="82" class="er-tag" text-anchor="end">PK</text>
+          <text x="322" y="102" class="er-col-k">public_slug</text><text x="558" y="102" class="er-tag" text-anchor="end">UNIQUE</text>
+          <text x="322" y="122" class="er-col-k">owner_id</text><text x="558" y="122" class="er-tag" text-anchor="end">FK</text>
+          <text x="322" y="142" class="er-col-k">game_id</text><text x="558" y="142" class="er-tag" text-anchor="end">FK</text>
+          <text x="322" y="162" class="er-col">status</text>
+          <text x="322" y="182" class="er-col">visibility</text>
+          <text x="322" y="202" class="er-col">trigger_type</text>
+          <text x="322" y="222" class="er-col">duration_ms</text>
+          <text x="322" y="242" class="er-col">captured_at</text><text x="558" y="242" class="er-tag" text-anchor="end">SORT</text>
+          <text x="322" y="262" class="er-col">uploaded_at</text>
+          <text x="322" y="282" class="er-col">storage_tier</text>
+          <text x="322" y="302" class="er-col">capture_meta</text><text x="558" y="302" class="er-tag" text-anchor="end">JSONB</text>
+          <text x="322" y="322" class="er-col">view_count</text>
+          <text x="322" y="342" class="er-col">deleted_at</text>
+
+          <rect x="650" y="146" width="200" height="102" rx="3" class="er-body"></rect>
+          <rect x="650" y="120" width="200" height="26" rx="3" class="er-head"></rect>
+          <text x="662" y="138" class="er-head-t">clip_renditions</text>
+          <text x="662" y="162" class="er-col-k">clip_id</text><text x="838" y="162" class="er-tag" text-anchor="end">PK FK</text>
+          <text x="662" y="182" class="er-col-k">label</text><text x="838" y="182" class="er-tag" text-anchor="end">PK</text>
+          <text x="662" y="202" class="er-col">status</text>
+          <text x="662" y="222" class="er-col">storage_key</text>
+          <text x="662" y="242" class="er-col">bytes</text>
+
+          <path d="M230,100 L270,100 L270,118 L306,118" class="er-rel" marker-end="url(#s-a)"></path>
+          <text x="240" y="94" class="er-card">1</text>
+          <text x="290" y="112" class="er-card">N</text>
+
+          <path d="M230,330 L266,330 L266,138 L306,138" class="er-rel" marker-end="url(#s-a)"></path>
+          <text x="240" y="324" class="er-card">1</text>
+          <text x="284" y="154" class="er-card">N</text>
+
+          <path d="M570,80 L610,80 L610,158 L646,158" class="er-rel" marker-end="url(#s-a)"></path>
+          <text x="580" y="74" class="er-card">1</text>
+          <text x="624" y="152" class="er-card">N</text>
+
+          <rect x="310" y="410" width="540" height="74" rx="4" class="er-ghost"></rect>
+          <text x="326" y="434" class="er-ghost-t">clip_events</text>
+          <text x="326" y="454" class="d-sm">clip_created, clip_trimmed, clip_viewed, clip_shared, clip_deleted</text>
+          <text x="326" y="472" class="d-sm">NOT a Postgres table. Goes to the event pipeline.</text>
+
+          <path d="M440,350 L440,406" class="d-line-probe" marker-end="url(#s-p)"></path>
+
+          <text x="30" y="516" class="d-key">create index on clips (owner_id, captured_at desc, id desc) where deleted_at is null;</text>
+          <text x="30" y="536" class="d-sm">partition by range (captured_at), monthly</text>
+        </svg>
+      </div>
+      <figcaption><b>Four tables and one deliberate absence.</b> The dashed box is the point: view events are the highest-volume thing in the whole system and they do not belong in your primary database. A row per view in Postgres is the mistake this diagram exists to prevent. <code>view_count</code> on <code>clips</code> is a denormalized copy fed back from the pipeline in batches.</figcaption>
+    </figure>
+
+    <div class="stack">
+      <h3>What to say about each choice</h3>
+      <ul class="tight">
+        <li><strong><code>id</code> is a UUIDv7, <code>public_slug</code> is separate.</strong> Time-ordered ids index well; a random UUID as primary key wrecks insert locality. The slug is what appears in the URL, so it is short and not enumerable.</li>
+        <li><strong>Two timestamps.</strong> <code>captured_at</code> comes from a clock you do not control and can lag by days. <code>uploaded_at</code> is yours. Sort by the first, trust the second.</li>
+        <li><strong>Renditions are a table, not columns.</strong> This is what makes lazy transcoding possible without a migration every time you add a size.</li>
+        <li><strong>The partial index</strong> (<code>where deleted_at is null</code>) keeps soft-deleted rows out of the index entirely. This is the specific thing you would give up on MySQL.</li>
+        <li><strong>Monthly partitions</strong> turn retention into <code>DROP PARTITION</code> instead of deleting a hundred million rows.</li>
+      </ul>
+    </div>
+
+    <div class="callout probe">
+      <span class="tag">If they ask you to write it out</span>
+      <p>You do not need exact syntax. Draw the boxes, name the columns, say the five bullets above. An interviewer asking for a schema wants to see that your entities match your access patterns, not that you remember whether it is <code>timestamptz</code> or <code>timestamp with time zone</code>. Those are the same thing anyway.</p>
+    </div>
+  </section>
+
+  <section id="drill">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">03</p>
+      <h2>How to actually drill this</h2>
+    </div>
+
+    <div class="stack">
+      <p>Reading a diagram five times does almost nothing. Reproducing it once does more than reading it ten times. So:</p>
+      <ol class="tight">
+        <li><strong>Round one, copy it.</strong> Look at the system diagram and redraw it on paper. You are learning the spatial layout, not testing yourself yet.</li>
+        <li><strong>Round two, boxes only, from memory.</strong> Nine boxes. If you miss one, look, then start again from a blank page rather than patching it in.</li>
+        <li><strong>Round three, add arrows and say the nine steps out loud</strong> as you draw each one. Out loud matters, because the interview is spoken and you need the words attached to the strokes.</li>
+        <li><strong>Round four, the schema.</strong> Four tables, then the relationships, then the dashed events box last.</li>
+        <li><strong>Round five, both, timed.</strong> Four minutes for the pair. Hit that and you will never be the candidate staring at a blank whiteboard.</li>
+      </ol>
+
+      <div class="callout">
+        <span class="tag">The two you cannot get wrong</span>
+        <p><strong>The fork at step 3</strong> (metadata to the API, bytes past it to storage) and <strong>steps 8 and 9</strong> (viewer to CDN to object storage). Those are the exact two places you got tangled in the mock, and they are the same principle pointing in opposite directions: your application tier moves metadata, never video. Get those right and the rest is ordinary infrastructure.</p>
+      </div>
+    </div>
+  </section>
+
+</div>

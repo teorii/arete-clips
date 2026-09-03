@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clip library</title>
+<style>
+  :root {
+    --bg: #0b0e14; --panel: #141922; --line: #232b39;
+    --text: #e6edf3; --dim: #8b97a8; --accent: #4f9cf9;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+    padding: 32px 24px 64px;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 24px; }
+  h1 { font-size: 21px; margin: 0; font-weight: 600; }
+  .count { color: var(--dim); font-size: 14px; }
+  .hint {
+    margin-left: auto; color: var(--dim); font-size: 13px;
+    font-family: ui-monospace, "Cascadia Code", monospace;
+  }
+  .grid {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    overflow: hidden; text-decoration: none; color: inherit; display: block;
+    transition: border-color .15s, transform .15s;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .thumb {
+    aspect-ratio: 16/9; background: #000 center/cover no-repeat;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--dim); font-size: 13px; position: relative;
+  }
+  .dur {
+    position: absolute; right: 8px; bottom: 8px; background: rgba(0,0,0,.78);
+    padding: 2px 7px; border-radius: 4px; font-size: 12px; color: #fff;
+  }
+  .body { padding: 11px 13px 13px; }
+  .title { font-size: 14px; font-weight: 600; margin-bottom: 5px; }
+  .sub { color: var(--dim); font-size: 12px; display: flex; gap: 10px; }
+  .empty {
+    border: 1px dashed var(--line); border-radius: 10px; padding: 44px;
+    text-align: center; color: var(--dim);
+  }
+  code {
+    background: var(--panel); border: 1px solid var(--line);
+    padding: 2px 6px; border-radius: 5px; font-size: 13px; color: var(--text);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Clip library</h1>
+    <span class="count">{{ clips|length }} clip{{ "" if clips|length == 1 else "s" }}</span>
+    <span class="hint">F9 to clip the last 30s</span>
+  </header>
+
+  {% if clips %}
+  <div class="grid">
+    {% for c in clips %}
+      {% set thumb = (c.renditions | selectattr("label", "equalto", "thumb") | list | first) %}
+      <a class="card" href="/c/{{ c.public_slug }}">
+        <div class="thumb" {% if thumb and thumb.url %}style="background-image:url('{{ thumb.url }}')"{% endif %}>
+          {% if not (thumb and thumb.url) %}{{ c.status }}{% endif %}
+          <span class="dur">{{ (c.duration_ms / 1000) | round(0) | int }}s</span>
+        </div>
+        <div class="body">
+          <div class="title">{{ c.title or "Untitled clip" }}</div>
+          <div class="sub">
+            <span>{{ c.captured_at.strftime("%b %d, %H:%M") }}</span>
+            <span>{{ c.view_count }} views</span>
+          </div>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">
+    No clips yet. Start the capture daemon with
+    <code>python -m capture.daemon</code> and press F9 in game.
+  </div>
+  {% endif %}
+</div>
+</body>
+</html>

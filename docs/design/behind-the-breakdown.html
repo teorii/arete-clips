@@ -1,0 +1,871 @@
+<title>Behind The Breakdown</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  --paper:#EFF2F5; --surface:#FFFFFF; --surface-2:#E3E9EF;
+  --ink:#131920; --ink-2:#4A5563; --ink-3:#78838F;
+  --rule:#CBD3DC; --rule-soft:#DDE3EA;
+  --signal:#9A5B06; --signal-bg:#FBF0DC;
+  --probe:#0B6E82; --probe-bg:#DEEDF1;
+  --crit:#A32E28; --crit-bg:#F8E4E2;
+  --good:#1B6146; --good-bg:#DEEEE6;
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --s--1:0.8125rem; --s-0:1.0625rem; --s-1:1.1875rem; --s-2:1.4375rem; --s-3:1.875rem; --s-4:2.5rem;
+  --col:68ch; --wide:62rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:#0E1319; --surface:#171F27; --surface-2:#1F2A34;
+    --ink:#E4EAF0; --ink-2:#A5B1BE; --ink-3:#6F7C8A;
+    --rule:#2B3641; --rule-soft:#222C36;
+    --signal:#F0AE38; --signal-bg:#2A2113;
+    --probe:#3FC3DC; --probe-bg:#12262B;
+    --crit:#E8756C; --crit-bg:#2C1A18;
+    --good:#4FBF8B; --good-bg:#12291F;
+  }
+}
+:root[data-theme="dark"] {
+  --paper:#0E1319; --surface:#171F27; --surface-2:#1F2A34;
+  --ink:#E4EAF0; --ink-2:#A5B1BE; --ink-3:#6F7C8A;
+  --rule:#2B3641; --rule-soft:#222C36;
+  --signal:#F0AE38; --signal-bg:#2A2113;
+  --probe:#3FC3DC; --probe-bg:#12262B;
+  --crit:#E8756C; --crit-bg:#2C1A18;
+  --good:#4FBF8B; --good-bg:#12291F;
+}
+
+* { box-sizing:border-box; }
+body { background:var(--paper); color:var(--ink); font-family:var(--body); font-size:var(--s-0); line-height:1.62; margin:0; padding:0 1.5rem 6rem; -webkit-font-smoothing:antialiased; }
+.wrap { max-width:var(--wide); margin:0 auto; display:flex; flex-direction:column; gap:3.25rem; }
+p, ul, ol { margin:0; }
+a { color:var(--signal); text-underline-offset:2px; }
+a:focus-visible { outline:2px solid var(--signal); outline-offset:3px; }
+
+.masthead { padding-top:3.5rem; display:flex; flex-direction:column; gap:1.25rem; max-width:var(--col); }
+.eyebrow { font-family:var(--mono); font-size:var(--s--1); font-weight:500; letter-spacing:0.14em; text-transform:uppercase; color:var(--signal); margin:0; }
+h1 { font-family:var(--display); font-variation-settings:"wdth" 112; font-weight:700; font-size:clamp(2.25rem,6vw,var(--s-4)); line-height:1.04; letter-spacing:-0.015em; text-wrap:balance; margin:0; }
+.deck { font-size:var(--s-1); color:var(--ink-2); line-height:1.55; }
+.meta { display:flex; flex-wrap:wrap; gap:0.5rem 1.75rem; font-family:var(--mono); font-size:var(--s--1); color:var(--ink-3); padding-top:0.5rem; border-top:1px solid var(--rule); }
+.meta b { color:var(--ink-2); font-weight:500; }
+
+.toc { display:grid; grid-template-columns:repeat(auto-fill,minmax(17rem,1fr)); border-top:1px solid var(--rule); border-left:1px solid var(--rule); }
+.toc a { display:flex; gap:0.75rem; align-items:baseline; padding:0.8rem 1rem; border-right:1px solid var(--rule); border-bottom:1px solid var(--rule); text-decoration:none; color:var(--ink); font-size:var(--s--1); }
+.toc a:hover { background:var(--surface); }
+.toc a span { font-family:var(--mono); color:var(--signal); font-size:0.75rem; }
+
+section { display:flex; flex-direction:column; gap:1.5rem; }
+.sec-head { display:flex; flex-direction:column; gap:0.75rem; }
+.ruler { height:11px; background-image:repeating-linear-gradient(to right,var(--rule) 0 1px,transparent 1px 14px); background-position:bottom left; background-repeat:repeat-x; border-bottom:1px solid var(--rule); }
+.sec-label { font-family:var(--mono); font-size:0.75rem; font-weight:500; letter-spacing:0.16em; text-transform:uppercase; color:var(--ink-3); }
+h2 { font-family:var(--display); font-variation-settings:"wdth" 108; font-weight:700; font-size:var(--s-3); line-height:1.12; letter-spacing:-0.012em; text-wrap:balance; margin:0; max-width:24ch; }
+
+.q {
+  font-family:var(--display); font-variation-settings:"wdth" 102;
+  font-weight:600; font-size:var(--s-2); line-height:1.22;
+  margin:1.5rem 0 0; text-wrap:balance; max-width:34ch;
+  padding-left:0.9rem; border-left:3px solid var(--signal);
+}
+h4 { font-family:var(--display); font-variation-settings:"wdth" 100; font-weight:600; font-size:var(--s-1); line-height:1.25; margin:0.75rem 0 0; }
+
+.stack { display:flex; flex-direction:column; gap:1rem; max-width:var(--col); }
+ul.tight, ol.tight { padding-left:1.15rem; display:flex; flex-direction:column; gap:0.55rem; }
+ul.tight li::marker { color:var(--signal); }
+ol.tight li::marker { color:var(--signal); font-family:var(--mono); font-size:0.85em; }
+code { font-family:var(--mono); font-size:0.875em; background:var(--surface-2); padding:0.08em 0.36em; border-radius:3px; }
+strong { font-weight:600; color:var(--ink); }
+
+pre.code { margin:0; overflow-x:auto; background:var(--surface); border:1px solid var(--rule); border-left:3px solid var(--probe); padding:1.15rem 1.25rem; font-family:var(--mono); font-size:0.7625rem; line-height:1.7; color:var(--ink); max-width:var(--col); }
+pre.code .c { color:var(--ink-3); }
+pre.code .k { color:var(--probe); font-weight:500; }
+
+.callout { max-width:var(--col); padding:1.1rem 1.25rem; border-left:3px solid var(--signal); background:var(--signal-bg); display:flex; flex-direction:column; gap:0.6rem; font-size:var(--s--1); line-height:1.6; }
+.callout .tag { font-family:var(--mono); font-size:0.7rem; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:var(--signal); }
+.callout.trap { border-left-color:var(--crit); background:var(--crit-bg); }
+.callout.trap .tag { color:var(--crit); }
+.callout.data { border-left-color:var(--probe); background:var(--probe-bg); }
+.callout.data .tag { color:var(--probe); }
+.callout.win { border-left-color:var(--good); background:var(--good-bg); }
+.callout.win .tag { color:var(--good); }
+
+.tablewrap { overflow-x:auto; border:1px solid var(--rule); background:var(--surface); }
+table { border-collapse:collapse; width:100%; min-width:34rem; font-size:var(--s--1); }
+th, td { text-align:left; padding:0.65rem 0.9rem; border-bottom:1px solid var(--rule-soft); vertical-align:top; }
+thead th { font-family:var(--mono); font-size:0.68rem; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:var(--ink-3); border-bottom:1px solid var(--rule); background:var(--surface-2); }
+tbody tr:last-child td { border-bottom:none; }
+td.what { color:var(--ink); font-weight:500; }
+td.why { color:var(--ink-2); }
+td.mono { font-family:var(--mono); font-size:0.95em; color:var(--signal); white-space:nowrap; }
+td.srv { color:var(--signal); font-family:var(--mono); font-size:0.9em; }
+td.cli { color:var(--probe); font-family:var(--mono); font-size:0.9em; }
+td.none { color:var(--ink-3); }
+
+.pc { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--rule); border:1px solid var(--rule); max-width:var(--col); }
+.pc > div { background:var(--surface); padding:1rem 1.15rem; display:flex; flex-direction:column; gap:0.6rem; }
+.pc-head { font-family:var(--mono); font-size:0.68rem; font-weight:600; letter-spacing:0.13em; text-transform:uppercase; }
+.pc .pro .pc-head { color:var(--good); }
+.pc .con .pc-head { color:var(--crit); }
+.pc ul { padding-left:1.05rem; display:flex; flex-direction:column; gap:0.45rem; font-size:var(--s--1); color:var(--ink-2); line-height:1.5; margin:0; }
+.pc .pro li::marker { color:var(--good); }
+.pc .con li::marker { color:var(--crit); }
+.pc b { color:var(--ink); }
+@media (max-width:38rem) { .pc { grid-template-columns:1fr; } }
+
+.db { display:flex; flex-direction:column; gap:1px; background:var(--rule); border:1px solid var(--rule); }
+.db-row { background:var(--surface); padding:1.05rem 1.2rem; display:flex; flex-direction:column; gap:0.6rem; border-left:3px solid var(--ink-3); }
+.db-row.pick { border-left-color:var(--good); background:var(--good-bg); }
+.db-name { display:flex; align-items:baseline; gap:0.7rem; flex-wrap:wrap; }
+.db-name h4 { margin:0; font-size:var(--s-1); }
+.db-tag { font-family:var(--mono); font-size:0.66rem; font-weight:600; letter-spacing:0.13em; text-transform:uppercase; color:var(--good); border:1px solid var(--good); padding:0.1em 0.45em; border-radius:2px; }
+.db-row dl { display:grid; grid-template-columns:4.5rem 1fr; gap:0.5rem 0.9rem; margin:0; font-size:var(--s--1); line-height:1.55; }
+.db-row dt { font-family:var(--mono); font-size:0.66rem; font-weight:600; letter-spacing:0.11em; text-transform:uppercase; color:var(--ink-3); padding-top:0.3em; }
+.db-row dd { margin:0; color:var(--ink-2); }
+.db-row dd b { color:var(--ink); }
+@media (max-width:34rem) { .db-row dl { grid-template-columns:1fr; gap:0.15rem; } }
+
+figure { margin:0; display:flex; flex-direction:column; gap:0.85rem; background:var(--surface); border:1px solid var(--rule); padding:1.5rem 1.25rem 1.25rem; }
+.fig-scroll { overflow-x:auto; }
+figure svg { display:block; width:100%; min-width:34rem; height:auto; color:var(--ink-2); }
+figcaption { font-size:var(--s--1); color:var(--ink-2); line-height:1.55; max-width:62ch; border-top:1px solid var(--rule-soft); padding-top:0.85rem; }
+figcaption b { color:var(--ink); }
+
+.dg-box { fill:var(--surface-2); stroke:var(--rule); stroke-width:1; }
+.dg-box-key { fill:var(--signal-bg); stroke:var(--signal); stroke-width:1.5; }
+.dg-region { fill:none; stroke:var(--signal); stroke-width:1.5; stroke-dasharray:6 4; }
+.dg-region-plain { fill:none; stroke:var(--rule); stroke-width:1.5; }
+.dg-t { font-family:"IBM Plex Sans",system-ui,sans-serif; font-size:12px; fill:var(--ink); }
+.dg-t-sm { font-family:"IBM Plex Mono",monospace; font-size:10.5px; fill:var(--ink-3); }
+.dg-t-lbl { font-family:"IBM Plex Mono",monospace; font-size:10.5px; fill:var(--ink-2); letter-spacing:0.06em; }
+.dg-t-key { font-family:"IBM Plex Mono",monospace; font-size:10.5px; fill:var(--signal); }
+.dg-t-crit { font-family:"IBM Plex Mono",monospace; font-size:10.5px; fill:var(--crit); }
+.dg-line { stroke:var(--ink-3); stroke-width:1.25; fill:none; }
+.dg-line-key { stroke:var(--signal); stroke-width:2; fill:none; }
+.dg-line-bad { stroke:var(--crit); stroke-width:2; fill:none; stroke-dasharray:5 3; }
+.dg-divider { stroke:var(--rule); stroke-width:1; stroke-dasharray:3 4; }
+.dg-arrow { fill:var(--ink-3); }
+.dg-arrow-key { fill:var(--signal); }
+.dg-arrow-bad { fill:var(--crit); }
+
+@media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Companion to the problem breakdown</p>
+    <h1>Behind The Breakdown</h1>
+    <p class="deck">The mechanics underneath the answer. Why the API looks like that, what actually happens to a byte, and how to defend the choices when an interviewer pushes. Two of these answers correct errors you found in the breakdown itself.</p>
+    <div class="meta">
+      <span><b>Reads with</b> The Medal Question</span>
+      <span><b>Purpose</b> understanding, not memorization</span>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="Contents">
+    <a href="#dur"><span>01</span> Durability vs. availability</a>
+    <a href="#api"><span>02</span> APIs, from the ground up</a>
+    <a href="#proxy"><span>03</span> Why not proxy the video</a>
+    <a href="#ids"><span>04</span> Entities, ids, and the index</a>
+    <a href="#buffer"><span>05</span> Saving the last N seconds</a>
+    <a href="#when"><span>06</span> What updates, and when</a>
+    <a href="#lazy"><span>07</span> The cost of a rendition</a>
+    <a href="#stores"><span>08</span> Choosing the stores</a>
+    <a href="#vram"><span>09</span> Inside GPU memory</a>
+    <a href="#lifecycle"><span>10</span> What tiering actually means</a>
+  </nav>
+
+  <!-- 01 -->
+  <section id="dur">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">01</p>
+      <h2>Durability vs. availability</h2>
+    </div>
+
+    <div class="stack">
+      <p class="q">You said durability over availability. Isn't it more important that the product always clips?</p>
+
+      <div class="callout win">
+        <span class="tag">You are right, and my phrasing was sloppy</span>
+        <p>What you are describing is real, and it is the most important reliability property in the system. But it is not what "availability" means here, and merging them hides the actual insight. Three things my one line smashed together:</p>
+      </div>
+
+      <p><strong>Durability</strong> means: once we have told you we accepted your data, we will not lose it. It is about not losing what you already hold. It has nothing to do with accuracy or with the clip being correct.</p>
+
+      <p><strong>Availability</strong> means: the system answers requests right now. A service at 99.9% availability is unreachable about 43 minutes a month.</p>
+
+      <p><strong>Capture reliability</strong>, the thing you actually named, means: when the player hits the hotkey, a clip gets saved. This is a <em>client</em> property, not a backend one, and that distinction is the whole point:</p>
+
+      <div class="callout">
+        <span class="tag">The insight your question uncovers</span>
+        <p><strong>The capture path never touches the backend.</strong> The ring buffer is in the player's RAM and on their disk. The hotkey writes a local file. If every server we own is on fire, the client still captures, still saves, still queues the upload for later. Capture reliability is near-total <em>precisely because it does not depend on us.</em></p>
+      </div>
+
+      <p>That is what makes the durability-over-availability trade cheap. Once the client is offline-first, backend downtime becomes nearly invisible at the moment that matters:</p>
+
+      <ul class="tight">
+        <li><strong>Backend down for ten minutes:</strong> the player clips normally. The queue drains when we return. Most users never notice. <em>Availability requirement: moderate.</em></li>
+        <li><strong>Backend loses an uploaded clip:</strong> that moment is gone forever. The player cannot re-play the match. No retry, no regeneration, no apology that helps. <em>Durability requirement: extreme.</em></li>
+      </ul>
+
+      <p>So the sentence I should have written is: <strong>"Because the client is offline-first, capture never depends on our uptime. That lets us trade backend availability for durability, and we should, because a slow clip is annoying and a lost clip is unrecoverable."</strong></p>
+
+      <p>Say it that way. It is a better answer than the breakdown's because it explains <em>why</em> you are allowed to make the trade instead of just asserting it.</p>
+    </div>
+  </section>
+
+  <!-- 02 -->
+  <section id="api">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">02</p>
+      <h2>APIs, from the ground up</h2>
+    </div>
+
+    <div class="stack">
+      <p>You said you do not know APIs well, so this starts from zero.</p>
+
+      <p>An <strong>API endpoint</strong> is a URL plus a verb the client can call over the network. <code>POST /clips</code> means "send a message to the <code>/clips</code> address using the POST verb." The verbs carry conventional meaning:</p>
+      <ul class="tight">
+        <li><strong>GET</strong> reads. Changes nothing. Safe to retry and to cache.</li>
+        <li><strong>POST</strong> creates something new or triggers an action. Not safe to blindly retry, since two POSTs may create two things.</li>
+        <li><strong>PATCH</strong> partially updates an existing thing. You send only the fields you are changing.</li>
+        <li><strong>PUT</strong> replaces it entirely. You send every field.</li>
+        <li><strong>DELETE</strong> removes it.</li>
+      </ul>
+
+      <p class="q">Why does POST send fields that are already in the schema?</p>
+
+      <p>This is the crux, and it is a common confusion. <strong>The schema is where data lands. The request body is how it gets there.</strong> They overlap on purpose.</p>
+
+      <p>Your server has no idea your clip is 28,400 milliseconds long. That file was never on your machine. The only way that number reaches the <code>duration_ms</code> column is if the client puts it in a request and sends it. A schema describes a table; it is not a channel through which data arrives.</p>
+
+      <p>The useful way to read any API is to ask, for every field: <em>who is the authority on this value?</em></p>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th scope="col">Field</th><th scope="col">Authority</th><th scope="col">How it reaches the database</th></tr></thead>
+        <tbody>
+          <tr><td class="what">clipId</td><td class="srv">server</td><td class="why">Generated on POST and returned in the response. The client learns it from us.</td></tr>
+          <tr><td class="what">publicSlug</td><td class="srv">server</td><td class="why">Generated. Must be globally unique, so only the server can safely mint it.</td></tr>
+          <tr><td class="what">ownerId</td><td class="srv">server</td><td class="why"><b>Never accepted from the client.</b> Read from the auth token. If clients could send this, I could upload clips into your account.</td></tr>
+          <tr><td class="what">gameId</td><td class="cli">client</td><td class="why">The client detected which game was running. We cannot know this. Sent in the POST body.</td></tr>
+          <tr><td class="what">durationMs</td><td class="cli">client</td><td class="why">It made the file. Sent in the body.</td></tr>
+          <tr><td class="what">capturedAt</td><td class="cli">client</td><td class="why">Its own clock. Sent in the body, then <b>validated</b>, because that clock is not trustworthy.</td></tr>
+          <tr><td class="what">captureMeta</td><td class="cli">client</td><td class="why">Encoder used, GPU, measured fps impact. Only the client can observe these.</td></tr>
+          <tr><td class="what">uploadedAt</td><td class="srv">server</td><td class="why">Set when <code>complete</code> is called. Our clock, which we trust.</td></tr>
+          <tr><td class="what">status</td><td class="srv">server</td><td class="why">A state machine we own. A client requesting <code>status: ready</code> would be skipping transcoding.</td></tr>
+          <tr><td class="what">viewCount</td><td class="srv">server</td><td class="why">Derived from the event pipeline in batches. Never written directly by anyone.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="stack">
+      <div class="callout trap">
+        <span class="tag">The rule worth saying out loud</span>
+        <p><strong>Never accept a field from the client that the client should not control.</strong> Ownership comes from the auth token. Status comes from your own state machine. Timestamps that matter come from your clock. That one sentence covers a large share of the security surface of any API, and interviewers notice when it arrives unprompted.</p>
+      </div>
+
+      <p class="q">Why is there a PATCH with trimStart and trimEnd if the client trims before upload?</p>
+
+      <div class="callout trap">
+        <span class="tag">You found a real bug</span>
+        <p>Those two things contradict each other and you were right to catch it. I wrote "trim on the client before upload" in the design, then put trim fields in <code>PATCH</code> without reconciling them. Here is the honest picture.</p>
+      </div>
+
+      <p>There are two different trims, and they are not variations of one feature:</p>
+
+      <ol class="tight">
+        <li><strong>Trim before upload (the client path).</strong> The user drags handles in the desktop app and the file that uploads is already cut. Fewer bytes on the wire, instant feedback, no server work. This is the primary path and it is what the design should describe.</li>
+        <li><strong>Re-trim afterwards (the server path).</strong> The user opens the clip on the web a week later and wants to tighten the opening. The source is on our servers now, not their PC, so the server has to re-cut: keep the source around rather than tiering it away, and re-encode the partial GOP at each ragged edge.</li>
+      </ol>
+
+      <p><strong>My recommendation for a 45-minute interview: cut the trim fields from PATCH.</strong> Leave it for <code>title</code> and <code>visibility</code> only. If they ask about re-trimming, say this:</p>
+
+      <div class="callout">
+        <span class="tag">The answer if they ask</span>
+        <p><em>"Trimming is client-side before upload, because it saves bandwidth and gives instant feedback. Server-side re-trim is a v2 feature and it is not free: it requires retaining the source instead of tiering it away, and it means a keyframe-aligned re-cut with a re-encode at each edge. I would want it eventually, but it fights the retention policy, so I would want to know how often people actually re-trim before paying for it."</em></p>
+      </div>
+
+      <p>That turns a hole in the design into a demonstration that you understand what a feature costs. The fields are now removed from the breakdown's API.</p>
+    </div>
+  </section>
+
+  <!-- 03 -->
+  <section id="proxy">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">03</p>
+      <h2>Why not proxy the video</h2>
+    </div>
+
+    <div class="stack">
+      <p class="q">Why is it wrong to send 40 MB through your application servers?</p>
+      <p>It is not wrong in the abstract, and plenty of systems do it. It is wrong <em>at this volume</em>, for reasons worth naming concretely rather than asserting "it does not scale."</p>
+    </div>
+
+    <div class="pc">
+      <div class="pro">
+        <p class="pc-head">What proxying buys you</p>
+        <ul>
+          <li><b>Simpler client.</b> One authenticated request, no presigned URL dance, no multipart bookkeeping.</li>
+          <li><b>Synchronous inspection.</b> You can scan, validate, or reject content before it reaches storage.</li>
+          <li><b>One auth path.</b> No signed URLs that might leak or outlive their usefulness.</li>
+          <li><b>Immediate quota enforcement,</b> rather than discovering afterwards that a user blew past their limit.</li>
+          <li>Genuinely right for <b>small files</b>: avatars, thumbnails, config blobs.</li>
+        </ul>
+      </div>
+      <div class="con">
+        <p class="pc-head">Why it fails here</p>
+        <ul>
+          <li><b>Connection hold time.</b> A 40 MB upload on a slow uplink holds a connection ~40 seconds. At 14 uploads/sec that is <b>roughly 560 connections open at all times</b>, purely relaying bytes.</li>
+          <li><b>You pay for the bytes twice:</b> ingress to your servers, then egress from your servers to storage.</li>
+          <li><b>You scale on throughput, not requests.</b> Your fleet gets sized in gigabits rather than QPS, a far more expensive way to buy capacity.</li>
+          <li><b>Deploys become destructive.</b> Restarting an app server kills every in-flight upload on it.</li>
+          <li><b>Resumability becomes yours to build.</b> Object storage gives you multipart resume for free.</li>
+          <li><b>Infrastructure limits.</b> Many gateways cap request body size or duration well below what you need.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="stack">
+      <p>The 560-connections figure is the one to say out loud. It is a consequence of your own numbers rather than a general principle, which makes it hard to argue with.</p>
+      <p>With presigned URLs your API handles two tiny JSON requests per clip and never touches a video byte. The 48 TB/day flows from the player's machine straight into object storage, a service built for exactly that and priced accordingly.</p>
+    </div>
+  </section>
+
+  <!-- 04 -->
+  <section id="ids">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">04</p>
+      <h2>Entities, ids, and the index</h2>
+    </div>
+
+    <div class="stack">
+      <p class="q">What is ClipEvent?</p>
+      <p>A record that something <em>happened</em>, as opposed to a record of something that <em>exists</em>. <code>Clip</code> is a noun. <code>ClipEvent</code> is a verb with a timestamp.</p>
+    </div>
+
+    <pre class="code">{
+  <span class="k">"event"</span>:  <span class="c">"clip_trimmed"</span>,
+  <span class="k">"clipId"</span>: <span class="c">"018f2c4a-9e11-7c3b-a4f0-6d2e19bb7c55"</span>,
+  <span class="k">"userId"</span>: <span class="c">"7d91a3f0-2b88-4c11-9f3a-1e7742aa0d19"</span>,
+  <span class="k">"at"</span>:     <span class="c">"2026-09-02T18:44:02Z"</span>,
+  <span class="k">"payload"</span>: {
+    <span class="k">"originalStartMs"</span>: 0,      <span class="c">// they saved 60 seconds</span>
+    <span class="k">"originalEndMs"</span>:   60000,
+    <span class="k">"finalStartMs"</span>:    41200,  <span class="c">// and kept 9 of them</span>
+    <span class="k">"finalEndMs"</span>:      50300   <span class="c">// a free human label</span>
+  }
+}</pre>
+
+    <div class="stack">
+      <p>Why name it as an entity and then immediately say it does not live in Postgres:</p>
+      <ul class="tight">
+        <li><strong>Volume.</strong> One popular clip can generate tens of thousands of view events. Those are rows you never query transactionally and never join. Putting them in your primary database bloats the thing your product depends on, for no benefit.</li>
+        <li><strong>A different kind of question.</strong> You ask analytical questions of events ("median watch-through by game this week"), not transactional ones. Columnar warehouses answer those far faster than a row store.</li>
+        <li><strong>A different durability bar.</strong> Losing a clip is unacceptable. Losing 0.1% of view events is a rounding error inside an aggregate.</li>
+      </ul>
+      <p>So events go to the pipeline (collector, stream, warehouse), and only <em>derived</em> values like <code>view_count</code> come back into Postgres as denormalized columns.</p>
+
+      <p class="q">What does publicSlug actually do?</p>
+      <p>The clip's real id is a UUID like <code>018f2c4a-9e11-7c3b-a4f0-6d2e19bb7c55</code>. Three problems with putting that in a URL:</p>
+      <ul class="tight">
+        <li><strong>It is long and ugly.</strong> A share link that wraps onto two lines in Discord is a worse product.</li>
+        <li><strong>It couples your public surface to your internal keys.</strong> A slug can be rotated or revoked without touching a primary key or any foreign key pointing at it.</li>
+        <li><strong>It should be unguessable.</strong> An "unlisted" clip is protected by nothing except the difficulty of guessing its URL.</li>
+      </ul>
+      <p>So <code>public_slug</code> is a short random base62 string and <code>medal.tv/c/aB3xK9pQ</code> is what gets pasted. Eight base62 characters gives about 2.2&nbsp;&times;&nbsp;10<sup>14</sup> possibilities, so against a few hundred million clips, guessing one is hopeless. That is the sizing argument if they ask why eight.</p>
+
+      <p class="q">Why keep a deleted_at?</p>
+      <p>This is a <strong>soft delete</strong>: the row survives but every query filters it out, so the clip vanishes from the user's view instantly. Four reasons:</p>
+      <ol class="tight">
+        <li><strong>Undo.</strong> People delete clips by accident and want them back an hour later.</li>
+        <li><strong>The bytes are not gone yet.</strong> Removing a row takes a millisecond. Removing the source, every rendition, the thumbnail, and the CDN cache entries is an async job that can fail and retry. <code>deleted_at</code> means "hidden from the user, cleanup pending."</li>
+        <li><strong>Nothing else breaks.</strong> Analytics rows, share links, and embeds referencing the clip do not hit dangling references mid-cleanup.</li>
+        <li><strong>Holds.</strong> A clip under abuse investigation may need to outlive the uploader deleting it.</li>
+      </ol>
+      <p>The cost is that rows accumulate and every query needs <code>where deleted_at is null</code>. Which is exactly why the index looks the way it does.</p>
+
+      <p class="q">What does the index on clips do?</p>
+      <p>An index is a sorted structure kept beside the table so the database can jump straight to the rows it wants instead of reading all of them. Without one, "this user's 30 most recent clips" means scanning a table with hundreds of millions of rows.</p>
+    </div>
+
+    <pre class="code"><span class="k">create index on</span> clips (owner_id, captured_at <span class="k">desc</span>, id <span class="k">desc</span>)
+  <span class="k">where</span> deleted_at <span class="k">is null</span>;</pre>
+
+    <div class="stack">
+      <p>Every part of that line is doing a job, and the column order is not arbitrary:</p>
+      <ul class="tight">
+        <li><strong><code>owner_id</code> first</strong> because it is an equality filter. It narrows hundreds of millions of rows to one user's few hundred in a single seek. The selective equality column goes first.</li>
+        <li><strong><code>captured_at desc</code> second</strong> because that is the order the query wants. Rows come out of the index already sorted, so the database skips sorting entirely. Without it, the database would fetch all your clips and then sort them.</li>
+        <li><strong><code>id desc</code> third</strong> as a tiebreaker. Two clips can share a timestamp, and without a deterministic tiebreak your pagination cursor is ambiguous: you can see a row twice or skip it between pages.</li>
+        <li><strong><code>where deleted_at is null</code></strong> makes it a <em>partial</em> index. Deleted clips are never indexed, so it stays smaller, stays in memory more easily, and does not grow with your soft-delete graveyard.</li>
+      </ul>
+      <p>Together those turn the library query into a seek plus reading thirty consecutive entries, no matter how large the table grows. That is what makes keyset pagination work.</p>
+    </div>
+  </section>
+
+  <!-- 05 -->
+  <section id="buffer">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">05</p>
+      <h2>Saving the last N seconds</h2>
+    </div>
+
+    <div class="stack">
+      <p class="q">How do I actually save the last N seconds to disk?</p>
+      <p>The mental model that makes this click: <strong>you are not starting a recording. You are deciding to keep one that has been running the entire time.</strong> The encoder never stopped. The hotkey only chooses which part of its output survives.</p>
+      <p>The buffer holds already-compressed chunks, each tagged with a presentation timestamp and whether it is a keyframe:</p>
+    </div>
+
+    <pre class="code"><span class="c"># Each chunk is compressed output from the hardware encoder,
+# not a raw frame. ~1.25 MB/s total, so 60s is about 75 MB.</span>
+buffer    = deque()          <span class="c"># of (pts_ms, is_keyframe, bytes)</span>
+WINDOW_MS = 60_000
+
+<span class="k">def</span> on_encoded_chunk(chunk):
+    buffer.append(chunk)
+    <span class="c"># Evict anything that has aged out of the window.</span>
+    <span class="k">while</span> buffer[0].pts_ms &lt; chunk.pts_ms - WINDOW_MS:
+        buffer.popleft()
+
+<span class="k">def</span> on_hotkey(save_seconds=30):
+    now   = buffer[-1].pts_ms
+    start = now - save_seconds * 1000
+
+    <span class="c"># A file may only begin at a keyframe. Walk backwards to the last
+    # one at or before our target, which is why the saved clip can
+    # start up to one GOP (~2s) earlier than the user asked for.</span>
+    i = last_index_where(buffer, <span class="k">lambda</span> c: c.is_keyframe <span class="k">and</span> c.pts_ms &lt;= start)
+
+    write_container(buffer[i:], out_path)   <span class="c"># header, chunks, index</span></pre>
+
+    <div class="stack">
+      <p>Three details worth knowing, because they are what a follow-up question probes:</p>
+      <ul class="tight">
+        <li><strong>You cannot start anywhere.</strong> The walk backwards to a keyframe is why "last 30 seconds" is really "last 30 to 32 seconds." Volunteering that shows you understand the format instead of reciting it.</li>
+        <li><strong>The container needs an index.</strong> An MP4 carries a table telling players where each frame lives. Written normally it lands at the end of the file, so a crash mid-write leaves something unplayable. Fragmented MP4 avoids this by keeping the file valid at every point.</li>
+        <li><strong>RAM alone is not enough.</strong> An in-memory buffer dies with the process, and games crash. The disk-backed version continuously writes rotating segment files (say 2 seconds each, keeping the last 30), so saving becomes "concatenate segments N through M and remux." It survives a hard crash, and remuxing is nearly free because no video is re-encoded.</li>
+      </ul>
+      <div class="callout">
+        <span class="tag">Connect it back</span>
+        <p>The disk-backed design is what makes the earlier argument land: the clip a player most wants is often the one from right before the game crashed, and only a disk-backed buffer still has it.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 -->
+  <section id="when">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">06</p>
+      <h2>What updates, and when</h2>
+    </div>
+
+    <div class="stack">
+      <p class="q">What storage and status is updated when a user watches a clip?</p>
+      <div class="callout trap">
+        <span class="tag">My prose was ambiguous</span>
+        <p>"Writing back to storage and updating the clip's status" described the <em>transcode worker</em>, not a viewer. I put that sentence in the "users can watch" section, which made it read as though watching triggers a status write. It does not. Here is every moment laid out.</p>
+      </div>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th scope="col">Moment</th><th scope="col">Object storage</th><th scope="col">clips row</th><th scope="col">clip_renditions</th><th scope="col">Event pipeline</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="what">Client calls POST /clips</td>
+            <td class="none">nothing yet</td>
+            <td class="why">row created, <code>pending_upload</code></td>
+            <td class="none">none</td>
+            <td class="why">clip_created</td>
+          </tr>
+          <tr>
+            <td class="what">Chunks upload</td>
+            <td class="why">source parts land</td>
+            <td class="none">unchanged</td>
+            <td class="none">none</td>
+            <td class="none">progress only</td>
+          </tr>
+          <tr>
+            <td class="what">Client calls complete</td>
+            <td class="why">parts assembled into one object</td>
+            <td class="why"><code>uploaded</code>, <code>uploaded_at</code> set</td>
+            <td class="none">none</td>
+            <td class="why">clip_uploaded</td>
+          </tr>
+          <tr>
+            <td class="what">Transcode worker finishes</td>
+            <td class="why">720p + thumbnail written</td>
+            <td class="why"><code>ready</code></td>
+            <td class="why">720p row, <code>ready</code></td>
+            <td class="why">clip_transcoded, with latency</td>
+          </tr>
+          <tr>
+            <td class="what"><b>A viewer plays the clip</b></td>
+            <td class="none">read only</td>
+            <td class="none"><b>nothing synchronously</b></td>
+            <td class="none">read only</td>
+            <td class="why">clip_viewed, watch %</td>
+          </tr>
+          <tr>
+            <td class="what">Viewer needs a rendition we lack</td>
+            <td class="why">1080p written when done</td>
+            <td class="none">unchanged</td>
+            <td class="why">1080p row, queued then ready</td>
+            <td class="why">rendition_requested</td>
+          </tr>
+          <tr>
+            <td class="what">Batch job runs</td>
+            <td class="none">none</td>
+            <td class="why"><code>view_count</code> updated</td>
+            <td class="none">none</td>
+            <td class="none">reads from warehouse</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="stack">
+      <p>The row to point at is the bolded one. <strong>A view changes nothing in your primary database at the time it happens.</strong> If it did, a clip going viral would become a write storm against the table your entire product depends on, with every one of those writes contending for the same row. Views become an event; the counter catches up later.</p>
+      <p>That is the answer interviewers are listening for, and it is the same principle as the <code>ClipEvent</code> discussion: the event stream is the source of truth, and the Postgres column is a convenience copy.</p>
+    </div>
+  </section>
+
+  <!-- 07 -->
+  <section id="lazy">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">07</p>
+      <h2>The cost of a rendition</h2>
+    </div>
+
+    <div class="stack">
+      <p class="q">If we already have the video, doesn't it cost the same to have multiple renditions?</p>
+      <div class="callout data">
+        <span class="tag">The misconception, named</span>
+        <p>Having the source does not give you the renditions. A rendition is not a view of the video or a setting on it. <strong>It is a separate file, produced by separate work.</strong> Each one costs compute once and storage forever.</p>
+      </div>
+      <p>To make a 720p version, a worker must <em>decode</em> the 1080p source back into raw frames and <em>re-encode</em> them at the new resolution and bitrate. That is real CPU or GPU time, per rendition. The result is then its own object in storage, paid for every month it exists.</p>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th scope="col">Asset</th><th scope="col">Size</th><th scope="col">Produced by</th></tr></thead>
+        <tbody>
+          <tr><td class="what">Source (1080p60)</td><td class="mono">~40 MB</td><td class="why">The client. Already exists, costs no extra compute.</td></tr>
+          <tr><td class="what">720p rendition</td><td class="mono">~9 MB</td><td class="why">A decode plus an encode.</td></tr>
+          <tr><td class="what">480p rendition</td><td class="mono">~4 MB</td><td class="why">Another decode plus encode.</td></tr>
+          <tr><td class="what">360p rendition</td><td class="mono">~2 MB</td><td class="why">Another decode plus encode.</td></tr>
+          <tr><td class="what">Full ladder adds</td><td class="mono">~15 MB</td><td class="why">Roughly 37% on top of the source, plus three transcode jobs.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="stack">
+      <p>Now apply the watch rate. If roughly 70% of clips are never opened by anyone, then eager transcoding means <strong>70% of that compute and 70% of those stored bytes are pure waste</strong>, spent producing files no human will ever request.</p>
+      <p>One clarification the breakdown could have made better: this is not all-or-nothing.</p>
+    </div>
+
+    <div class="pc">
+      <div class="pro">
+        <p class="pc-head">Lazy renditions, upside</p>
+        <ul>
+          <li><b>Skip the waste entirely</b> for clips nobody watches, which is most of them.</li>
+          <li><b>Faster time-to-link.</b> One encode finishes sooner than four, so the share link goes live earlier.</li>
+          <li><b>Cost tracks usage,</b> scaling with what people watch rather than what they upload.</li>
+        </ul>
+      </div>
+      <div class="con">
+        <p class="pc-head">Lazy renditions, cost</p>
+        <ul>
+          <li><b>The first viewer may wait</b> if the rendition they need does not exist yet.</li>
+          <li><b>Concurrency needs care.</b> A clip going viral means many simultaneous requests for the same missing rendition, so you need a lock or dedupe key to transcode it once rather than five hundred times.</li>
+          <li><b>Spiky load,</b> arriving exactly when a clip is getting attention.</li>
+          <li><b>More moving parts</b> than "transcode everything on ingest."</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="callout win">
+        <span class="tag">The design that gets both</span>
+        <p><strong>Eagerly produce exactly one rendition</strong>, a 720p that plays acceptably for nearly everyone, so there is never a cold start on the first view. <strong>Generate the rest lazily,</strong> only when a viewer's bandwidth actually calls for a different rung of the ladder. You keep instant playback and still skip the majority of the waste. Say it in that shape and the "but the first viewer waits" objection is answered before it is raised.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 08 -->
+  <section id="stores">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">08</p>
+      <h2>Choosing the stores</h2>
+    </div>
+
+    <div class="stack">
+      <p class="q">What about object storage? Is that also in Postgres?</p>
+      <div class="callout data">
+        <span class="tag">No, and this distinction is fundamental</span>
+        <p>They are two separate systems holding two completely different things. This trips up a lot of people and it is worth being crisp about.</p>
+      </div>
+      <ul class="tight">
+        <li><strong>Postgres holds metadata:</strong> small structured rows describing clips. Who owns it, when it was captured, how long it is, what state it is in. Queryable, joinable, transactional. A clip's row is maybe 300 bytes.</li>
+        <li><strong>Object storage (S3, R2, GCS) holds the video files.</strong> Large opaque blobs. You cannot query, sort, or join them. You can only put, get, and delete by key. A clip's file is 40 MB.</li>
+      </ul>
+      <p>The link between them is one string. <code>clip_renditions.storage_key</code> holds something like <code>clips/018f2c4a/720p.mp4</code>, which is the address of the bytes. Postgres knows <em>about</em> the video; object storage <em>has</em> it.</p>
+      <p>Putting video in Postgres would be a serious mistake: it inflates every backup, forces replication to ship gigabytes to every replica, and costs roughly ten to fifty times more per gigabyte, all to hold data you can never query anyway.</p>
+
+      <p class="q">Why Postgres and not the alternatives?</p>
+      <p>Because your own estimate said 14 writes per second. Lead with that number, because it makes every choice after it defensible.</p>
+    </div>
+
+    <div class="db">
+      <div class="db-row pick">
+        <div class="db-name"><h4>PostgreSQL</h4><span class="db-tag">The pick</span></div>
+        <dl>
+          <dt>For</dt><dd>Transactions and joins while the product is still changing shape. Handles this scale without strain. Partitioning makes time-based expiry a partition drop. JSONB absorbs <code>capture_meta</code> without schema churn. Partial indexes serve the soft-delete pattern exactly. Operationally boring, which is a feature.</dd>
+          <dt>Against</dt><dd>One writer. Vertical scaling has a ceiling, and sharding past it is manual work you have to design yourself.</dd>
+          <dt>Verdict</dt><dd><b>At 14 writes/sec and a few hundred million rows a year you are nowhere near that ceiling.</b> Name the trigger that would change your mind: when index maintenance starts showing up in write latency.</dd>
+        </dl>
+      </div>
+
+      <div class="db-row">
+        <div class="db-name"><h4>DynamoDB</h4></div>
+        <dl>
+          <dt>For</dt><dd>Effectively unbounded scale, predictable single-digit millisecond reads, no servers to operate.</dd>
+          <dt>Against</dt><dd>You must know your access patterns before designing the table. A new query pattern means a new secondary index or a migration. No joins, so a friends feed becomes application-side assembly. Costs can exceed a single Postgres instance considerably at high read volume.</dd>
+          <dt>Verdict</dt><dd>Solves a scale problem you do not have, at the price of the flexibility you do need while the product is young.</dd>
+        </dl>
+      </div>
+
+      <div class="db-row">
+        <div class="db-name"><h4>Cassandra</h4></div>
+        <dl>
+          <dt>For</dt><dd>Enormous write throughput, linear horizontal scaling, multi-region active-active writes.</dd>
+          <dt>Against</dt><dd>Eventual consistency creates a real product bug here: a user uploads a clip, refreshes their library, and it is not there yet. Heavy operational burden. Queries must be designed into the partition key up front.</dd>
+          <dt>Verdict</dt><dd>Built for write volumes orders of magnitude above yours. Choosing it reads as pattern-matching on the word "video."</dd>
+        </dl>
+      </div>
+
+      <div class="db-row">
+        <div class="db-name"><h4>MongoDB</h4></div>
+        <dl>
+          <dt>For</dt><dd>Flexible documents, quick to start, comfortable if the team already runs it.</dd>
+          <dt>Against</dt><dd>Your model is plainly relational: users own clips, clips have renditions. You would hand-roll joins you get free elsewhere, and Postgres already offers schemaless fields via JSONB where you want them.</dd>
+          <dt>Verdict</dt><dd>Not wrong, just not better here.</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="stack">
+      <p>Worth noting that a real system runs several stores at once, each for a different job. Saying so shows you understand that "which database" is rarely one choice:</p>
+      <ul class="tight">
+        <li><strong>Postgres</strong> for clip metadata and everything transactional.</li>
+        <li><strong>Object storage</strong> for the video bytes.</li>
+        <li><strong>Redis</strong> in front of hot clips, so one going viral does not hammer the database for the same row a million times.</li>
+        <li><strong>A columnar warehouse</strong> (ClickHouse, BigQuery, Snowflake) for the event pipeline and analytical questions.</li>
+      </ul>
+      <div class="callout">
+        <span class="tag">The framing that scores</span>
+        <p><em>"I want the boring relational database for the transactional core, because the write volume genuinely does not require anything else and I would rather keep joins and transactions while the product is still changing. The scale in this problem is in the bytes, and those never go near the database at all."</em> That last sentence is the one showing you understood the shape of the system rather than its subject matter.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 09 -->
+  <section id="vram">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">09</p>
+      <h2>Inside GPU memory</h2>
+    </div>
+
+    <div class="stack">
+      <p class="q">What is a GPU texture, and how does only the compressed stream reach system memory?</p>
+
+      <p>Start with the fact that makes everything else make sense: <strong>your machine has two separate pools of memory.</strong> System RAM sits next to the CPU. VRAM sits on the graphics card. They are physically different chips, connected by a cable-like bus called PCIe. Moving data between them is a real transfer with a real cost, not a pointer change.</p>
+
+      <p>A <strong>texture</strong> is simply a block of VRAM formatted as an image: a width, a height, and a pixel format. The name comes from game art (the wood grain on a crate is a texture), but the GPU uses the same structure for anything 2D, including <em>the frame it just finished drawing</em>. When a game renders, the output lands in a texture in VRAM called the render target, and the display controller reads that texture to light up your monitor.</p>
+
+      <div class="callout win">
+        <span class="tag">The load-bearing observation</span>
+        <p><strong>The frame is already in VRAM. It was born there.</strong> Nobody had to put it there, and the encoder you want to use is on the same chip. The only question is whether you are disciplined enough to leave it alone.</p>
+      </div>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 760 362" role="img" aria-label="Two memory pools separated by the PCIe bus. Inside GPU memory the game renders a frame texture and the hardware encoder reads it in place. Only the compressed output, about 21 kilobytes per frame, crosses into system RAM. The alternative copies the whole 8.3 megabyte texture across for every frame.">
+          <defs>
+            <marker id="ar5k" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="dg-arrow-key"></path></marker>
+            <marker id="ar5b" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="dg-arrow-bad"></path></marker>
+            <marker id="ar5n" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="dg-arrow"></path></marker>
+          </defs>
+
+          <text x="390" y="20" class="dg-t-lbl" text-anchor="middle">PCIe BUS</text>
+          <line x1="390" y1="30" x2="390" y2="316" class="dg-divider"></line>
+
+          <rect x="16" y="40" width="340" height="266" rx="4" class="dg-region"></rect>
+          <text x="28" y="60" class="dg-t-key">GPU MEMORY (VRAM)</text>
+
+          <rect x="32" y="74" width="308" height="42" rx="3" class="dg-box"></rect>
+          <text x="186" y="100" class="dg-t" text-anchor="middle">Game renders into a texture</text>
+
+          <line x1="186" y1="116" x2="186" y2="144" class="dg-line" marker-end="url(#ar5n)"></line>
+
+          <rect x="32" y="148" width="308" height="52" rx="3" class="dg-box-key"></rect>
+          <text x="186" y="170" class="dg-t" text-anchor="middle">Frame texture</text>
+          <text x="186" y="187" class="dg-t-sm" text-anchor="middle">1920 x 1080 x 4 bytes = 8.3 MB</text>
+
+          <line x1="186" y1="200" x2="186" y2="240" class="dg-line-key" marker-end="url(#ar5k)"></line>
+          <text x="196" y="224" class="dg-t-key">handed over by handle, not copied</text>
+
+          <rect x="32" y="244" width="308" height="46" rx="3" class="dg-box"></rect>
+          <text x="186" y="264" class="dg-t" text-anchor="middle">Hardware encoder (NVENC)</text>
+          <text x="186" y="280" class="dg-t-sm" text-anchor="middle">reads the texture where it already sits</text>
+
+          <rect x="424" y="40" width="316" height="266" rx="4" class="dg-region-plain"></rect>
+          <text x="436" y="60" class="dg-t-lbl">SYSTEM RAM</text>
+
+          <rect x="440" y="148" width="284" height="52" rx="3" class="dg-box"></rect>
+          <text x="582" y="170" class="dg-t" text-anchor="middle">Raw frame copy</text>
+          <text x="582" y="187" class="dg-t-crit" text-anchor="middle">8.3 MB arrives, 60x per second</text>
+
+          <rect x="440" y="244" width="284" height="46" rx="3" class="dg-box-key"></rect>
+          <text x="582" y="264" class="dg-t" text-anchor="middle">Ring buffer</text>
+          <text x="582" y="280" class="dg-t-key" text-anchor="middle">21 KB arrives, 60x per second</text>
+
+          <line x1="340" y1="174" x2="436" y2="174" class="dg-line-bad" marker-end="url(#ar5b)"></line>
+          <line x1="340" y1="267" x2="436" y2="267" class="dg-line-key" marker-end="url(#ar5k)"></line>
+
+          <text x="16" y="336" class="dg-t-sm">In the correct design the upper arrow does not exist. The texture never leaves VRAM.</text>
+          <text x="16" y="354" class="dg-t-sm">8.3 MB against 21 KB per frame is the 400x that decides whether the player notices you at all.</text>
+        </svg>
+      </div>
+      <figcaption><b>Only the bottom arrow should exist.</b> You hand the encoder a <em>handle</em> to the texture, the same idea as passing a pointer instead of copying a struct. NVENC is a dedicated block on the GPU die, so it reads that memory directly and writes a small compressed buffer. That buffer is the only thing you copy across the bus.</figcaption>
+    </figure>
+
+    <div class="stack">
+      <h4>Where the 21 KB comes from</h4>
+      <p>10&nbsp;Mbps divided by 60 frames per second is about 167 kilobits per frame, which is roughly 21&nbsp;KB. Against 8.3&nbsp;MB of raw pixels, that is the 400x. Doing that division out loud is a good move, because it shows the number is derived rather than memorized.</p>
+
+      <h4>Why the copy is worse than its size suggests</h4>
+      <p>A GPU-to-CPU copy is called a <strong>readback</strong>, and it hurts for two reasons rather than one:</p>
+      <ul class="tight">
+        <li><strong>Bandwidth.</strong> 500&nbsp;MB/s of sustained traffic across a bus the game is also using for its own asset streaming.</li>
+        <li><strong>Synchronization, which is the subtler one.</strong> The CPU cannot read a frame the GPU has not finished drawing. So a readback forces the CPU to wait for the GPU to catch up, which breaks the pipelining that normally lets them run ahead of each other. You lose framerate to <em>stalling</em>, not just to copying. This is the part most people miss, and mentioning it is a strong signal.</li>
+      </ul>
+
+      <h4>One detail that earns credit if you get there</h4>
+      <p>Games render in RGB. Video encoders want YUV, usually a format called NV12. That conversion has to happen somewhere, and a naive implementation does it on the CPU after a readback, which adds a second full pass over 8.3&nbsp;MB per frame. Done properly it happens on the GPU, either in a small shader or by the capture API itself, so it costs no bus traffic at all.</p>
+
+      <div class="callout">
+        <span class="tag">Concretely, on Windows</span>
+        <p>The Windows Graphics Capture API hands you a <code>Direct3D11CaptureFrame</code>, which wraps an <code>IDirect3DSurface</code>. That surface <em>is</em> a texture living in VRAM. The API gives you a GPU resource, not a buffer of pixels, and this is exactly what makes the zero-copy path possible. You register that surface with the encoder as an input resource and never touch the pixels yourself.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 -->
+  <section id="lifecycle">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">10</p>
+      <h2>What tiering actually means</h2>
+    </div>
+
+    <div class="stack">
+      <p class="q">What does "hot for 7 days, infrequent access to 90, then archive" really mean?</p>
+
+      <p>Object storage providers sell the <em>same object</em> at several different prices, called <strong>storage classes</strong>. Same bucket, same key, same API. What changes is how much you pay to keep it, how much you pay to read it, and how long you wait to get it back.</p>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th scope="col">Class</th><th scope="col">Storage</th><th scope="col">To read it back</th><th scope="col">Wait</th><th scope="col">Min. billed stay</th></tr></thead>
+        <tbody>
+          <tr><td class="what">Standard ("hot")</td><td class="mono">~$0.023/GB</td><td class="why">free</td><td class="why">milliseconds</td><td class="why">none</td></tr>
+          <tr><td class="what">Infrequent Access</td><td class="mono">~$0.0125/GB</td><td class="why">~$0.01/GB</td><td class="why">milliseconds</td><td class="why">30 days</td></tr>
+          <tr><td class="what">Archive, instant</td><td class="mono">~$0.004/GB</td><td class="why">~$0.03/GB</td><td class="why">milliseconds</td><td class="why">90 days</td></tr>
+          <tr><td class="what">Archive, flexible</td><td class="mono">~$0.0036/GB</td><td class="why">~$0.01/GB</td><td class="why"><b>minutes to hours</b></td><td class="why">90 days</td></tr>
+          <tr><td class="what">Deep archive</td><td class="mono">~$0.001/GB</td><td class="why">~$0.02/GB</td><td class="why"><b>up to 12 hours</b></td><td class="why">180 days</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="stack">
+      <p>Those are rough AWS list prices per month, in one region, at the time of writing. Treat them as orders of magnitude rather than quotes; they differ by provider and region and they change. The <em>shape</em> is what matters and the shape is stable: <strong>colder storage is cheaper to hold and more expensive to touch.</strong></p>
+
+      <p>A <strong>lifecycle policy</strong> is a rule you configure once on the bucket. You write no code and run no cron job. The provider scans your objects and moves them on the schedule you declared:</p>
+    </div>
+
+    <pre class="code">{
+  <span class="k">"Rules"</span>: [{
+    <span class="k">"ID"</span>: <span class="c">"clip-cooldown"</span>,
+    <span class="k">"Filter"</span>: { <span class="k">"Prefix"</span>: <span class="c">"clips/"</span> },
+    <span class="k">"Transitions"</span>: [
+      { <span class="k">"Days"</span>: 7,  <span class="k">"StorageClass"</span>: <span class="c">"STANDARD_IA"</span> },
+      { <span class="k">"Days"</span>: 90, <span class="k">"StorageClass"</span>: <span class="c">"GLACIER_IR"</span> }
+    ],
+    <span class="k">"Expiration"</span>: { <span class="k">"Days"</span>: 730 }
+  }]
+}</pre>
+
+    <div class="stack">
+      <p>That is the whole mechanism. "Hot for 7 days, infrequent access to 90, then archive" is a description of those three lines.</p>
+
+      <h4>Four ways it bites you</h4>
+      <ol class="tight">
+        <li><strong>Minimum billed stay.</strong> Move an object to Infrequent Access and delete it on day 10, and you are still charged for 30 days. Aggressively tiering short-lived objects can cost <em>more</em> than leaving them alone.</li>
+        <li><strong>Retrieval fees can swallow the savings.</strong> A clip you archived for $0.004/GB costs $0.03/GB to read. If it unexpectedly goes viral, you can spend more on retrieval in a week than you saved in a year.</li>
+        <li><strong>Retrieval latency is a product decision, not an ops one.</strong> Flexible and deep archive make you request a restore and wait. If a share link takes four hours to load, the product is broken. <strong>Any tier holding something a user can click must be an instant-retrieval class.</strong></li>
+        <li><strong>Minimum billable object size.</strong> Colder classes bill every object as at least 128&nbsp;KB. Your thumbnails are smaller than that, so tiering them actively loses money.</li>
+      </ol>
+
+      <div class="callout trap">
+        <span class="tag">Why the naive policy is wrong for this product</span>
+        <p>A flat time-based rule assumes access decays with age. <strong>For gameplay clips it decays with attention instead.</strong> A clip pasted into a large Discord gets watched for months; a clip nobody opened was dead within an hour. Age is a poor proxy for either. You already built the event pipeline that knows the difference, so use it: drive transitions from <code>last_viewed_at</code> and <code>view_count</code>, not from a calendar.</p>
+      </div>
+
+      <h4>The policy that actually fits</h4>
+      <p>Split the decision by asset, because the source and the rendition have completely different jobs:</p>
+      <ul class="tight">
+        <li><strong>The source (40&nbsp;MB) is never played.</strong> It exists only so you can transcode from it later. Tier it hard and fast, or delete it outright for free-tier users after a short window. This is where nearly all the money is.</li>
+        <li><strong>The 720p rendition (9&nbsp;MB) is what people actually watch.</strong> Keep it in an instant-retrieval class for far longer, because it is small and because a slow share link is a broken share link.</li>
+        <li><strong>Prefer deletion over archival</strong> where policy allows. Archiving a clip nobody wants still bills you every month forever. Deleting it bills you nothing. For user content with a poor watch rate, deletion is the real lever and tiering is the consolation prize.</li>
+      </ul>
+
+      <p>Here is what that is worth. Take a <em>single day</em> of uploads, roughly 60&nbsp;TB with lazy transcoding, and price what it costs per month once it has aged out:</p>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th scope="col">Policy for one day's uploads</th><th scope="col">Monthly cost</th><th scope="col">What you gave up</th></tr></thead>
+        <tbody>
+          <tr><td class="what">Everything in Standard, forever</td><td class="mono">~$1,380</td><td class="why">Nothing. And you pay it again for every other day, forever.</td></tr>
+          <tr><td class="what">Everything to instant archive</td><td class="mono">~$240</td><td class="why">Retrieval fees on anything that gets watched.</td></tr>
+          <tr><td class="what">Drop the source, keep 720p in archive</td><td class="mono">~$44</td><td class="why">Cannot re-transcode later, so no new renditions and no server-side re-trim.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="stack">
+      <div class="callout win">
+        <span class="tag">The number to land</span>
+        <p><strong>Roughly 31x, on one day of uploads.</strong> And the point that makes it matter: you upload another day tomorrow, and the day after. Under the naive policy you are paying rent on 365 days simultaneously by the end of year one. That compounding is why retention belongs in v1 rather than in a cost-cutting project eighteen months later, and it is the cleanest way to say why the schema is partitioned by month.</p>
+      </div>
+      <p>If an interviewer pushes on the numbers, concede the constants and hold the shape: <em>"I would not defend the exact dollar figures without checking current pricing, but the ratio between hot and archive is about an order of magnitude, and dropping the source removes about 80% of the bytes. Those two facts are what the design rests on."</em></p>
+    </div>
+  </section>
+
+</div>

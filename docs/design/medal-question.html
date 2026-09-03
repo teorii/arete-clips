@@ -1,0 +1,1160 @@
+<title>The Medal Question</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  --paper:      #EFF2F5;
+  --surface:    #FFFFFF;
+  --surface-2:  #E3E9EF;
+  --ink:        #131920;
+  --ink-2:      #4A5563;
+  --ink-3:      #78838F;
+  --rule:       #CBD3DC;
+  --rule-soft:  #DDE3EA;
+  --signal:     #9A5B06;
+  --signal-bg:  #FBF0DC;
+  --probe:      #0B6E82;
+  --probe-bg:   #DEEDF1;
+  --crit:       #A32E28;
+  --crit-bg:    #F8E4E2;
+  --good:       #1B6146;
+  --good-bg:    #DEEEE6;
+
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+
+  --s--1: 0.8125rem;
+  --s-0:  1.0625rem;
+  --s-1:  1.1875rem;
+  --s-2:  1.4375rem;
+  --s-3:  1.875rem;
+  --s-4:  2.5rem;
+
+  --col: 68ch;
+  --wide: 62rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:      #0E1319;
+    --surface:    #171F27;
+    --surface-2:  #1F2A34;
+    --ink:        #E4EAF0;
+    --ink-2:      #A5B1BE;
+    --ink-3:      #6F7C8A;
+    --rule:       #2B3641;
+    --rule-soft:  #222C36;
+    --signal:     #F0AE38;
+    --signal-bg:  #2A2113;
+    --probe:      #3FC3DC;
+    --probe-bg:   #12262B;
+    --crit:       #E8756C;
+    --crit-bg:    #2C1A18;
+    --good:       #4FBF8B;
+    --good-bg:    #12291F;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper:      #0E1319;
+  --surface:    #171F27;
+  --surface-2:  #1F2A34;
+  --ink:        #E4EAF0;
+  --ink-2:      #A5B1BE;
+  --ink-3:      #6F7C8A;
+  --rule:       #2B3641;
+  --rule-soft:  #222C36;
+  --signal:     #F0AE38;
+  --signal-bg:  #2A2113;
+  --probe:      #3FC3DC;
+  --probe-bg:   #12262B;
+  --crit:       #E8756C;
+  --crit-bg:    #2C1A18;
+  --good:       #4FBF8B;
+  --good-bg:    #12291F;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: var(--s-0);
+  line-height: 1.62;
+  margin: 0;
+  padding: 0 1.5rem 6rem;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: var(--wide); margin: 0 auto; display: flex; flex-direction: column; gap: 3.25rem; }
+
+p, ul, ol { margin: 0; }
+
+a { color: var(--signal); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; border-radius: 2px; }
+
+/* ---------- masthead ---------- */
+
+.masthead { padding-top: 3.5rem; display: flex; flex-direction: column; gap: 1.25rem; max-width: var(--col); }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: var(--s--1);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--signal);
+  margin: 0;
+}
+
+h1 {
+  font-family: var(--display);
+  font-variation-settings: "wdth" 112;
+  font-weight: 700;
+  font-size: clamp(2.25rem, 6vw, var(--s-4));
+  line-height: 1.04;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+  margin: 0;
+}
+
+.deck { font-size: var(--s-1); color: var(--ink-2); line-height: 1.55; }
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.75rem;
+  font-family: var(--mono);
+  font-size: var(--s--1);
+  color: var(--ink-3);
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--rule);
+}
+.meta b { color: var(--ink-2); font-weight: 500; }
+
+/* ---------- toc ---------- */
+
+.toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); }
+.toc a {
+  display: flex; gap: 0.75rem; align-items: baseline;
+  padding: 0.8rem 1rem;
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  text-decoration: none; color: var(--ink); font-size: var(--s--1);
+  transition: background 120ms ease;
+}
+.toc a:hover { background: var(--surface); }
+.toc a span { font-family: var(--mono); color: var(--signal); font-size: 0.75rem; letter-spacing: 0.06em; }
+
+/* ---------- sections ---------- */
+
+section { display: flex; flex-direction: column; gap: 1.5rem; }
+.sec-head { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.ruler {
+  height: 11px;
+  background-image: repeating-linear-gradient(to right, var(--rule) 0 1px, transparent 1px 14px);
+  background-position: bottom left;
+  background-repeat: repeat-x;
+  border-bottom: 1px solid var(--rule);
+}
+
+.sec-label {
+  font-family: var(--mono);
+  font-size: 0.75rem; font-weight: 500;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+h2 {
+  font-family: var(--display);
+  font-variation-settings: "wdth" 108;
+  font-weight: 700; font-size: var(--s-3);
+  line-height: 1.12; letter-spacing: -0.012em;
+  text-wrap: balance; margin: 0; max-width: 24ch;
+}
+
+h3 {
+  font-family: var(--display);
+  font-variation-settings: "wdth" 102;
+  font-weight: 600; font-size: var(--s-2);
+  line-height: 1.2; margin: 1.25rem 0 0;
+  text-wrap: balance;
+}
+
+h4 {
+  font-family: var(--display);
+  font-variation-settings: "wdth" 100;
+  font-weight: 600; font-size: var(--s-1);
+  line-height: 1.25; margin: 0.75rem 0 0;
+}
+
+/* ---------- prose ---------- */
+
+.stack { display: flex; flex-direction: column; gap: 1rem; max-width: var(--col); }
+
+ul.tight, ol.tight { padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.55rem; }
+ul.tight li::marker { color: var(--signal); }
+ol.tight li::marker { color: var(--signal); font-family: var(--mono); font-size: 0.85em; }
+
+code {
+  font-family: var(--mono); font-size: 0.875em;
+  background: var(--surface-2); padding: 0.08em 0.36em; border-radius: 3px;
+}
+
+strong { font-weight: 600; color: var(--ink); }
+
+pre.code {
+  margin: 0; overflow-x: auto;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--probe);
+  padding: 1.15rem 1.25rem;
+  font-family: var(--mono);
+  font-size: 0.7625rem; line-height: 1.65;
+  color: var(--ink); max-width: var(--col);
+}
+pre.code .c { color: var(--ink-3); }
+pre.code .k { color: var(--probe); font-weight: 500; }
+
+/* ---------- callouts ---------- */
+
+.callout {
+  max-width: var(--col);
+  padding: 1.1rem 1.25rem;
+  border-left: 3px solid var(--signal);
+  background: var(--signal-bg);
+  display: flex; flex-direction: column; gap: 0.6rem;
+  font-size: var(--s--1); line-height: 1.6;
+}
+.callout .tag {
+  font-family: var(--mono); font-size: 0.7rem; font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--signal);
+}
+.callout.trap { border-left-color: var(--crit); background: var(--crit-bg); }
+.callout.trap .tag { color: var(--crit); }
+.callout.data { border-left-color: var(--probe); background: var(--probe-bg); }
+.callout.data .tag { color: var(--probe); }
+
+/* ---------- requirements, above and below the line ---------- */
+
+.reqs { max-width: var(--col); display: flex; flex-direction: column; gap: 0; }
+.reqs-group { display: flex; flex-direction: column; gap: 0.75rem; padding: 1.1rem 0; }
+.reqs-head {
+  font-family: var(--mono); font-size: 0.7rem; font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-3);
+}
+.reqs ol { padding-left: 1.35rem; display: flex; flex-direction: column; gap: 0.5rem; margin: 0; }
+.reqs ol li::marker { font-family: var(--mono); font-size: 0.85em; color: var(--signal); }
+.the-line { display: flex; align-items: center; gap: 0.9rem; padding: 0.35rem 0; }
+.the-line-rule { flex: 1; height: 0; border-top: 2px dashed var(--crit); }
+.the-line span {
+  font-family: var(--mono); font-size: 0.68rem; font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--crit); white-space: nowrap;
+}
+.reqs-group.below { opacity: 0.78; }
+.reqs-group.below ol li::marker { color: var(--ink-3); }
+
+/* ---------- bad / good / great tiers ---------- */
+
+.tiers { display: flex; flex-direction: column; gap: 1px; background: var(--rule); border: 1px solid var(--rule); max-width: var(--col); }
+.tier { background: var(--surface); padding: 1.05rem 1.2rem; display: flex; flex-direction: column; gap: 0.7rem; border-left: 3px solid var(--ink-3); }
+.tier.bad   { border-left-color: var(--crit); }
+.tier.ok    { border-left-color: var(--signal); }
+.tier.great { border-left-color: var(--good); }
+.tier-name { display: flex; align-items: baseline; gap: 0.7rem; flex-wrap: wrap; }
+.tier-badge {
+  font-family: var(--mono); font-size: 0.66rem; font-weight: 600;
+  letter-spacing: 0.13em; text-transform: uppercase;
+  padding: 0.15em 0.5em; border-radius: 2px;
+}
+.tier.bad   .tier-badge { color: var(--crit);   background: var(--crit-bg); }
+.tier.ok    .tier-badge { color: var(--signal); background: var(--signal-bg); }
+.tier.great .tier-badge { color: var(--good);   background: var(--good-bg); }
+.tier-title { font-weight: 600; font-size: var(--s--1); color: var(--ink); }
+.tier-row { display: grid; grid-template-columns: 5.5rem 1fr; gap: 0.9rem; font-size: var(--s--1); line-height: 1.55; }
+.tier-row dt {
+  font-family: var(--mono); font-size: 0.66rem; font-weight: 600;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3);
+  padding-top: 0.28em;
+}
+.tier-row dd { margin: 0; color: var(--ink-2); }
+.tier-row dd b { color: var(--ink); font-weight: 600; }
+@media (max-width: 34rem) {
+  .tier-row { grid-template-columns: 1fr; gap: 0.2rem; }
+}
+
+/* ---------- term cards ---------- */
+
+.terms { display: grid; grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+.term { background: var(--surface); padding: 1.05rem 1.15rem; display: flex; flex-direction: column; gap: 0.45rem; }
+.term-name { font-family: var(--mono); font-size: 0.8125rem; font-weight: 600; color: var(--ink); }
+.term-def { font-size: var(--s--1); color: var(--ink-2); line-height: 1.55; }
+
+/* ---------- figures ---------- */
+
+figure { margin: 0; display: flex; flex-direction: column; gap: 0.85rem; background: var(--surface); border: 1px solid var(--rule); padding: 1.5rem 1.25rem 1.25rem; }
+.fig-scroll { overflow-x: auto; }
+figure svg { display: block; width: 100%; min-width: 34rem; height: auto; color: var(--ink-2); }
+figcaption { font-size: var(--s--1); color: var(--ink-2); line-height: 1.55; max-width: 62ch; border-top: 1px solid var(--rule-soft); padding-top: 0.85rem; }
+figcaption b { color: var(--ink); }
+
+.dg-box { fill: var(--surface-2); stroke: var(--rule); stroke-width: 1; }
+.dg-region { fill: none; stroke: var(--signal); stroke-width: 1.5; stroke-dasharray: 6 4; }
+.dg-box-key { fill: var(--signal-bg); stroke: var(--signal); stroke-width: 1.5; }
+.dg-box-data { fill: var(--probe-bg); stroke: var(--probe); stroke-width: 1.25; }
+.dg-t { font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 12px; fill: var(--ink); }
+.dg-t-sm { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; fill: var(--ink-3); }
+.dg-t-lbl { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; fill: var(--ink-2); }
+.dg-head { font-family: "Archivo", sans-serif; font-size: 12.5px; font-weight: 700; letter-spacing: 0.08em; fill: var(--ink); }
+.dg-line { stroke: var(--ink-3); stroke-width: 1.25; fill: none; }
+.dg-line-key { stroke: var(--signal); stroke-width: 2; fill: none; }
+.dg-line-data { stroke: var(--probe); stroke-width: 1.25; fill: none; stroke-dasharray: 4 3; }
+.dg-line-bad { stroke: var(--crit); stroke-width: 2; fill: none; stroke-dasharray: 5 3; }
+.dg-frame-i { fill: var(--signal); stroke: none; }
+.dg-frame-p { fill: var(--surface-2); stroke: var(--rule); stroke-width: 1; }
+.dg-arrow { fill: var(--ink-3); }
+.dg-arrow-key { fill: var(--signal); }
+.dg-arrow-data { fill: var(--probe); }
+.dg-arrow-bad { fill: var(--crit); }
+.dg-divider { stroke: var(--rule); stroke-width: 1; stroke-dasharray: 3 4; }
+.dg-t-crit { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; fill: var(--crit); }
+.dg-t-key { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; fill: var(--signal); }
+.dg-i-lbl { font-family: "IBM Plex Sans", system-ui, sans-serif; font-size: 12px; font-weight: 600; fill: var(--paper); }
+
+/* ---------- tables ---------- */
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--rule); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: var(--s--1); }
+th, td { text-align: left; padding: 0.7rem 1rem; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+thead th {
+  font-family: var(--mono); font-size: 0.7rem; font-weight: 600;
+  letter-spacing: 0.13em; text-transform: uppercase; color: var(--ink-3);
+  border-bottom: 1px solid var(--rule); background: var(--surface-2);
+}
+tbody tr:last-child td { border-bottom: none; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--signal); font-weight: 500; }
+td.what { color: var(--ink); }
+td.why { color: var(--ink-2); }
+
+/* ---------- seniority levels ---------- */
+
+.levels { display: flex; flex-direction: column; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+.level { background: var(--surface); padding: 1.2rem 1.3rem; display: flex; flex-direction: column; gap: 0.7rem; }
+.level.you { background: var(--signal-bg); border-left: 3px solid var(--signal); }
+.level-head { display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; }
+.level-head h4 { margin: 0; font-size: var(--s-1); }
+.level-you-tag {
+  font-family: var(--mono); font-size: 0.66rem; font-weight: 600;
+  letter-spacing: 0.13em; text-transform: uppercase; color: var(--signal);
+  border: 1px solid var(--signal); padding: 0.1em 0.45em; border-radius: 2px;
+}
+.level p, .level ul { font-size: var(--s--1); color: var(--ink-2); line-height: 1.58; }
+.level ul { padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.level li::marker { color: var(--ink-3); }
+.level b { color: var(--ink); }
+
+/* ---------- phases ---------- */
+
+.phases { display: flex; flex-direction: column; border-top: 1px solid var(--rule); }
+.phase { display: grid; grid-template-columns: 6.5rem 1fr; gap: 1.25rem; padding: 1.1rem 0; border-bottom: 1px solid var(--rule); align-items: start; }
+.phase-when { font-family: var(--mono); font-size: var(--s--1); font-variant-numeric: tabular-nums; color: var(--signal); font-weight: 500; }
+.phase-body { display: flex; flex-direction: column; gap: 0.5rem; }
+.phase-body h4 { margin: 0; font-size: var(--s-0); }
+.phase-body p, .phase-body ul { font-size: var(--s--1); color: var(--ink-2); }
+.phase-body ul { padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.phase-body li::marker { color: var(--ink-3); }
+.phase-body b { color: var(--ink); }
+@media (max-width: 34rem) { .phase { grid-template-columns: 1fr; gap: 0.5rem; } }
+
+.appendix-mark {
+  border-top: 2px solid var(--ink);
+  padding-top: 1.25rem;
+  font-family: var(--mono); font-size: 0.7rem; font-weight: 600;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3);
+}
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Problem breakdown &nbsp;//&nbsp; Wed 2 Sep</p>
+    <h1>The Medal Question</h1>
+    <p class="deck">Design a gameplay clip capture service. Content originates on a stranger's gaming PC, arrives constantly, and is watched almost never. That inverts nearly every instinct a video system design answer normally runs on.</p>
+    <div class="meta">
+      <span><b>Target</b> mid-level, 3 to 6 years</span>
+      <span><b>Scope</b> client-side capture, confirmed</span>
+      <span><b>Then</b> 30 min AI prototyping</span>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="Contents">
+    <a href="#understand"><span>01</span> Understand the problem</a>
+    <a href="#setup"><span>02</span> The set up</a>
+    <a href="#hld"><span>03</span> High-level design</a>
+    <a href="#dives"><span>04</span> Potential deep dives</a>
+    <a href="#levels"><span>05</span> Expected at each level</a>
+    <a href="#ai"><span>A1</span> The AI prototyping round</a>
+    <a href="#plan"><span>A2</span> Your next 48 hours</a>
+  </nav>
+
+  <!-- ============ 01 ============ -->
+  <section id="understand">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">01</p>
+      <h2>Understand the problem</h2>
+    </div>
+
+    <div class="stack">
+      <h3>What is a gameplay clip service?</h3>
+      <p><strong>Medal</strong> is a desktop application that continuously records gameplay in the background. When something good happens, the player presses a hotkey and the last thirty seconds are saved, trimmed, uploaded, and turned into a link they can paste into Discord before the next round starts.</p>
+      <p>The critical framing, and the thing to establish in your first two minutes: <strong>the content originates on the user's machine, not on your infrastructure.</strong> That single fact is what separates this from every video system design question you have practiced. It is worth explicitly naming the alternative you are not building.</p>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 760 410" role="img" aria-label="Side by side comparison. Client-side capture holds a ring buffer on the user's machine and pays for each clip in upload bandwidth. Server-side clipping stores every segment centrally and produces a clip by writing a new manifest, copying no bytes.">
+          <defs>
+            <marker id="ar2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="dg-arrow"></path></marker>
+            <marker id="ar2k" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="dg-arrow-key"></path></marker>
+            <marker id="ar2b" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="dg-arrow-bad"></path></marker>
+          </defs>
+
+          <line x1="380" y1="16" x2="380" y2="394" class="dg-divider"></line>
+
+          <text x="24" y="28" class="dg-head">A. CLIENT-SIDE CAPTURE (YOU)</text>
+          <text x="24" y="46" class="dg-t-sm">Medal, ShadowPlay, OBS replay buffer</text>
+
+          <rect x="24" y="62" width="310" height="40" rx="3" class="dg-box"></rect>
+          <text x="179" y="87" class="dg-t" text-anchor="middle">Game frames into GPU encoder</text>
+          <line x1="179" y1="102" x2="179" y2="128" class="dg-line" marker-end="url(#ar2)"></line>
+          <text x="187" y="120" class="dg-t-lbl">encodes always, ~5% fps cost</text>
+
+          <rect x="24" y="132" width="310" height="40" rx="3" class="dg-box-key"></rect>
+          <text x="179" y="157" class="dg-t" text-anchor="middle">Ring buffer: last 60s, on the client</text>
+          <line x1="179" y1="172" x2="179" y2="198" class="dg-line" marker-end="url(#ar2)"></line>
+          <text x="187" y="190" class="dg-t-lbl">hotkey flushes the buffer</text>
+
+          <rect x="24" y="202" width="310" height="40" rx="3" class="dg-box"></rect>
+          <text x="179" y="227" class="dg-t" text-anchor="middle">Local MP4, trimmed on device</text>
+          <line x1="179" y1="242" x2="179" y2="276" class="dg-line-bad" marker-end="url(#ar2b)"></line>
+          <text x="187" y="263" class="dg-t-crit">~40 MB over a home uplink</text>
+
+          <rect x="24" y="280" width="310" height="40" rx="3" class="dg-box"></rect>
+          <text x="179" y="305" class="dg-t" text-anchor="middle">Object storage</text>
+
+          <text x="24" y="352" class="dg-t-crit">Costly resource: the user's upload bandwidth.</text>
+          <text x="24" y="370" class="dg-t-sm">Nothing is stored until a human decides the moment mattered.</text>
+
+          <text x="414" y="28" class="dg-head">B. SERVER-SIDE VOD CLIPPING</text>
+          <text x="414" y="46" class="dg-t-sm">Twitch clips, YouTube Live clips</text>
+
+          <rect x="414" y="62" width="310" height="40" rx="3" class="dg-box"></rect>
+          <text x="569" y="87" class="dg-t" text-anchor="middle">Live stream ingest</text>
+          <line x1="569" y1="102" x2="569" y2="128" class="dg-line" marker-end="url(#ar2)"></line>
+          <text x="577" y="120" class="dg-t-lbl">packaged into 4s segments</text>
+
+          <rect x="414" y="132" width="310" height="40" rx="3" class="dg-box-key"></rect>
+          <text x="569" y="151" class="dg-t" text-anchor="middle">Segment store</text>
+          <text x="569" y="166" class="dg-t-sm" text-anchor="middle">every second of every stream, already kept</text>
+          <line x1="569" y1="172" x2="569" y2="198" class="dg-line-key" marker-end="url(#ar2k)"></line>
+          <text x="577" y="190" class="dg-t-key">clip = new manifest, segments N..M</text>
+
+          <rect x="414" y="202" width="310" height="40" rx="3" class="dg-box"></rect>
+          <text x="569" y="227" class="dg-t" text-anchor="middle">New manifest over existing files</text>
+          <line x1="569" y1="242" x2="569" y2="276" class="dg-line-key" marker-end="url(#ar2k)"></line>
+          <text x="577" y="263" class="dg-t-key">0 bytes copied, live instantly</text>
+
+          <rect x="414" y="280" width="310" height="40" rx="3" class="dg-box"></rect>
+          <text x="569" y="305" class="dg-t" text-anchor="middle">CDN</text>
+
+          <text x="414" y="352" class="dg-t-crit">Costly resource: storing every second, watched or not.</text>
+          <text x="414" y="370" class="dg-t-sm">Clipping is nearly free; recording everything is what costs.</text>
+        </svg>
+      </div>
+      <figcaption><b>You are building A.</b> In A you pay per saved clip, in bandwidth off a connection you do not control, and nothing is stored until a human decides the moment mattered. In B you pay per streamed hour whether anyone clips or not, and the clip itself is a metadata write. Naming B out loud, and saying why it is unavailable to you, is fifteen seconds that buys a lot of credibility.</figcaption>
+    </figure>
+
+    <div class="stack">
+      <h3>Functional requirements</h3>
+    </div>
+
+    <div class="reqs">
+      <div class="reqs-group">
+        <p class="reqs-head">Core requirements</p>
+        <ol>
+          <li>Users should be able to save the last N seconds of gameplay by pressing a hotkey.</li>
+          <li>Users should be able to trim a clip before publishing it.</li>
+          <li>Users should be able to upload a clip and get a shareable link.</li>
+          <li>Users should be able to watch a clip from that link.</li>
+          <li>Users should be able to browse and delete clips in their own library.</li>
+        </ol>
+      </div>
+      <div class="the-line">
+        <span>Below the line</span>
+        <span class="the-line-rule"></span>
+      </div>
+      <div class="reqs-group below">
+        <p class="reqs-head">Out of scope</p>
+        <ol>
+          <li>Social graph: following, friends feeds, notifications.</li>
+          <li>Comments, reactions, and content moderation.</li>
+          <li>Live streaming.</li>
+          <li>Multi-clip editing, montages, music overlays.</li>
+          <li>Console and mobile capture.</li>
+          <li>Monetization and creator payouts.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="stack">
+      <p>Say the below-the-line list out loud rather than silently ignoring it. Naming what you are cutting is how the interviewer knows you cut it deliberately.</p>
+
+      <h3>Non-functional requirements</h3>
+      <p>This is where this problem stops resembling a normal video question, so slow down here. Quantify everything.</p>
+    </div>
+
+    <div class="reqs">
+      <div class="reqs-group">
+        <p class="reqs-head">Core requirements</p>
+        <ol>
+          <li>The system should cost the player <strong>less than about 5% of their framerate</strong> while capturing. This is not a nice-to-have. A tool that drops a competitive shooter from 144 to 110&nbsp;fps gets uninstalled, and no other feature compensates.</li>
+          <li>The system should get from <strong>hotkey press to shareable link in under 30 seconds at p50</strong>, on a typical residential connection. Time-to-link is the product's north-star metric.</li>
+          <li>Uploads should be <strong>resumable across app crashes, reboots, and multi-day offline gaps.</strong></li>
+          <li>The system should prioritize <strong>durability over availability</strong> for clips. A clip that is briefly unviewable is annoying; a clip that is lost is gone forever, and the user was there for the moment.</li>
+          <li>The system should stay <strong>economical at a very poor watch rate.</strong> Assume most clips are viewed zero or one times, ever.</li>
+          <li>Scale target: <strong>10M MAU, 2M DAU, roughly 1.2M clips/day, roughly 48&nbsp;TB/day of ingest.</strong></li>
+        </ol>
+      </div>
+      <div class="the-line">
+        <span>Below the line</span>
+        <span class="the-line-rule"></span>
+      </div>
+      <div class="reqs-group below">
+        <p class="reqs-head">Out of scope</p>
+        <ol>
+          <li>Strong consistency on view counts and social counters.</li>
+          <li>Sub-100ms playback start worldwide.</li>
+          <li>Multi-region active-active.</li>
+          <li>Full compliance treatment, though consent for incidentally captured voice deserves one sentence.</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="tag">The move that separates you</span>
+      <p>Most candidates write non-functional requirements that would fit any system: "highly available, low latency, scalable." Requirement 1 above could not appear in any other problem, and it constrains the design more than the other five combined. Land it explicitly: <em>"The unusual constraint here is that our software runs on the user's GPU while they are playing a game, so our performance budget is measured in their framerate. I want to design around that first."</em></p>
+    </div>
+  </section>
+
+  <!-- ============ 02 ============ -->
+  <section id="setup">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">02</p>
+      <h2>The set up</h2>
+    </div>
+
+    <div class="stack">
+      <h3>Planning the approach</h3>
+      <p>Say your plan before you draw: entities, then API, then build the high-level design one functional requirement at a time, then go deep where they want. Announcing the sequence costs fifteen seconds and makes the rest of the hour legible.</p>
+      <p>One judgment call worth stating: <strong>you intend to spend meaningful time on the client.</strong> In most system design questions the client is a caller. Here it is the majority of the difficulty, and if you spend the whole hour to the right of it you will have answered a different question than the one asked.</p>
+
+      <h3>Defining the core entities</h3>
+      <ul class="tight">
+        <li><strong>User</strong> — account, tier (free or paid), storage quota.</li>
+        <li><strong>Clip</strong> — the central entity. Owner, game, capture time, duration, status, visibility, and the capture metadata that tells you how the recording actually went.</li>
+        <li><strong>Rendition</strong> — one encoded output of a clip at a given resolution. Deliberately a separate entity, because renditions are generated lazily and a clip may have only one for a long time.</li>
+        <li><strong>Game</strong> — reference data mapping a running process to a known title.</li>
+        <li><strong>ClipEvent</strong> — behavioral events. Worth naming as an entity <em>and</em> immediately saying it does not live in your primary database. It goes to the event pipeline.</li>
+      </ul>
+
+      <h3>The API</h3>
+    </div>
+
+    <pre class="code"><span class="c">// Create the record and get somewhere to put the bytes.</span>
+<span class="k">POST</span> /clips
+  { gameId, durationMs, capturedAt, sourceBytes, captureMeta }
+  <span class="c">-&gt; { clipId, publicSlug, uploadUrls: [...] }</span>
+
+<span class="c">// Client confirms all parts landed; server enqueues processing.</span>
+<span class="k">POST</span> /clips/:clipId/complete
+  { parts: [{ partNumber, etag }] }
+
+<span class="c">// Public read, cacheable, usually unauthenticated.</span>
+<span class="k">GET</span> /clips/:publicSlug
+  <span class="c">-&gt; { clip, renditions: [...], playbackUrl }</span>
+
+<span class="c">// The dominant authenticated read. Keyset pagination, not OFFSET.</span>
+<span class="k">GET</span> /users/me/clips?cursor=&amp;limit=30
+
+<span class="c">// Trim is NOT here: it happens on the client before upload.
+// Server-side re-trim is a v2 feature that fights the retention
+// policy, since it means keeping the source instead of tiering it.</span>
+<span class="k">PATCH</span>  /clips/:clipId   { title?, visibility? }
+<span class="k">DELETE</span> /clips/:clipId</pre>
+
+    <div class="callout">
+      <span class="tag">Point at this yourself</span>
+      <p>Notice that <strong>no endpoint accepts video bytes.</strong> The client PUTs directly to object storage using presigned URLs, and your API only ever moves metadata. Proxying 40&nbsp;MB of video through your application tier is the single most common mistake on this question, so call out that you have avoided it rather than hoping it is noticed.</p>
+    </div>
+  </section>
+
+  <!-- ============ 03 ============ -->
+  <section id="hld">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">03</p>
+      <h2>High-level design</h2>
+    </div>
+
+    <div class="stack">
+      <h3>Background: how gameplay capture works</h3>
+      <p>You do not need video expertise, but you do need these terms used correctly. If you have no video background, this is the section to over-prepare.</p>
+    </div>
+
+    <div class="terms">
+      <div class="term">
+        <p class="term-name">codec vs. container</p>
+        <p class="term-def">A codec (H.264, HEVC, AV1) compresses the pixels. A container (MP4, MKV) wraps video, audio, and metadata tracks together. Capture to H.264 in MP4 for universal playback.</p>
+      </div>
+      <div class="term">
+        <p class="term-name">hardware encoder</p>
+        <p class="term-def">Dedicated silicon on the GPU: NVENC on NVIDIA, Quick Sync on Intel, AMF on AMD. It does not compete with the game for shader cores. This is why the product can exist.</p>
+      </div>
+      <div class="term">
+        <p class="term-name">ring buffer</p>
+        <p class="term-def">A fixed-size circular buffer the client encodes into continuously, overwriting the oldest data. The hotkey does not start recording; it decides to keep what was already recorded.</p>
+      </div>
+      <div class="term">
+        <p class="term-name">I-frame, P-frame, GOP</p>
+        <p class="term-def">An I-frame is a complete image; P-frames store only differences from earlier frames. A GOP runs from one I-frame to the next, typically about 2 seconds.</p>
+      </div>
+      <div class="term">
+        <p class="term-name">remux vs. transcode</p>
+        <p class="term-def">Remux rewrites the container without touching compressed video: instant and lossless. Transcode decodes and re-encodes: slow, lossy, expensive. Say "remux" whenever you can avoid the latter.</p>
+      </div>
+      <div class="term">
+        <p class="term-name">ABR ladder</p>
+        <p class="term-def">Multiple encodes of one clip at different resolutions so the player can adapt to bandwidth. The lever in this problem is refusing to build the whole ladder up front.</p>
+      </div>
+      <div class="term">
+        <p class="term-name">bitrate math</p>
+        <p class="term-def">Bytes = bitrate &times; seconds / 8. 1080p60 gameplay wants 8 to 12&nbsp;Mbps because fast motion compresses badly, so 30 seconds is roughly 40&nbsp;MB.</p>
+      </div>
+      <div class="term">
+        <p class="term-name">presigned multipart upload</p>
+        <p class="term-def">Short-lived signed URLs let the client upload chunks directly to object storage, in parallel and resumably, without touching your servers.</p>
+      </div>
+    </div>
+
+    <div class="stack">
+      <h3>1) Users can save the last N seconds of gameplay</h3>
+      <p>Start here, and note something worth saying aloud: <strong>this first requirement is satisfied entirely on the client.</strong> No server appears in the design yet. The client continuously acquires rendered frames, encodes them with the GPU's hardware encoder, and writes the compressed output into a ring buffer. A hotkey flushes the buffer to a local file.</p>
+      <p>Two decisions to volunteer while you are here:</p>
+      <ul class="tight">
+        <li><strong>Back the ring buffer with disk, not just RAM.</strong> Games crash and GPU drivers reset, and the thirty seconds a player most wants to keep are very often the thirty seconds right before something went wrong. A pure RAM buffer loses exactly the footage with the highest save intent. At 10&nbsp;Mbps the write load is trivial.</li>
+        <li><strong>Keep audio on separate tracks.</strong> Game audio, microphone, and voice chat as distinct tracks rather than a premix. It is free at capture time and irreversible if skipped, and it unlocks the most requested feature in this category: muting your own microphone after you have heard what you said.</li>
+      </ul>
+
+      <h3>2) Users can trim a clip</h3>
+      <p>Trim on the client, before upload. It gives instant feedback and means fewer bytes on the wire. The mechanism is worth one diagram, because every trimming follow-up resolves to it.</p>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 700 220" role="img" aria-label="A strip of video frames with keyframes every eight frames. A cut in the middle of a group of pictures produces broken frames until the next keyframe. A cut aligned to a keyframe is clean and needs no re-encoding.">
+          <defs>
+            <marker id="ar1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="dg-arrow-bad"></path></marker>
+          </defs>
+          <text x="40" y="24" class="dg-head">ONE STRIP OF ENCODED VIDEO</text>
+          <text x="40" y="42" class="dg-t-sm">keyframe every 8 frames</text>
+          <rect x="40" y="68" width="30" height="44" rx="2" class="dg-frame-i"></rect>
+          <rect x="76" y="68" width="30" height="44" rx="2" class="dg-frame-p"></rect>
+          <rect x="112" y="68" width="30" height="44" rx="2" class="dg-frame-p"></rect>
+          <rect x="148" y="68" width="30" height="44" rx="2" class="dg-frame-p"></rect>
+          <rect x="184" y="68" width="30" height="44" rx="2" class="dg-frame-p"></rect>
+          <rect x="220" y="68" width="30" height="44" rx="2" class="dg-frame-p"></rect>
+          <rect x="256" y="68" width="30" height="44" rx="2" class="dg-frame-p"></rect>
+          <rect x="292" y="68" width="30" height="44" rx="2" class="dg-frame-p"></rect>
+          <rect x="328" y="68" width="30" height="44" rx="2" class="dg-frame-i"></rect>
+          <rect x="364" y="68" width="30" height="44" rx="2" class="dg-frame-p"></rect>
+          <rect x="400" y="68" width="30" height="44" rx="2" class="dg-frame-p"></rect>
+          <rect x="436" y="68" width="30" height="44" rx="2" class="dg-frame-p"></rect>
+          <rect x="472" y="68" width="30" height="44" rx="2" class="dg-frame-p"></rect>
+          <rect x="508" y="68" width="30" height="44" rx="2" class="dg-frame-p"></rect>
+          <rect x="544" y="68" width="30" height="44" rx="2" class="dg-frame-p"></rect>
+          <rect x="580" y="68" width="30" height="44" rx="2" class="dg-frame-p"></rect>
+          <rect x="616" y="68" width="30" height="44" rx="2" class="dg-frame-i"></rect>
+          <text x="55" y="95" class="dg-i-lbl" text-anchor="middle">I</text>
+          <text x="343" y="95" class="dg-i-lbl" text-anchor="middle">I</text>
+          <text x="631" y="95" class="dg-i-lbl" text-anchor="middle">I</text>
+          <text x="91" y="95" class="dg-t-sm" text-anchor="middle">P</text>
+          <text x="127" y="95" class="dg-t-sm" text-anchor="middle">P</text>
+          <text x="163" y="95" class="dg-t-sm" text-anchor="middle">P</text>
+          <text x="199" y="95" class="dg-t-sm" text-anchor="middle">P</text>
+          <text x="235" y="95" class="dg-t-sm" text-anchor="middle">P</text>
+          <text x="271" y="95" class="dg-t-sm" text-anchor="middle">P</text>
+          <text x="307" y="95" class="dg-t-sm" text-anchor="middle">P</text>
+          <text x="379" y="95" class="dg-t-sm" text-anchor="middle">P</text>
+          <text x="415" y="95" class="dg-t-sm" text-anchor="middle">P</text>
+          <text x="451" y="95" class="dg-t-sm" text-anchor="middle">P</text>
+          <text x="487" y="95" class="dg-t-sm" text-anchor="middle">P</text>
+          <text x="523" y="95" class="dg-t-sm" text-anchor="middle">P</text>
+          <text x="559" y="95" class="dg-t-sm" text-anchor="middle">P</text>
+          <text x="595" y="95" class="dg-t-sm" text-anchor="middle">P</text>
+          <path d="M40,120 L40,128 L322,128 L322,120" class="dg-line"></path>
+          <path d="M328,120 L328,128 L610,128 L610,120" class="dg-line"></path>
+          <text x="181" y="143" class="dg-t-sm" text-anchor="middle">GOP 1</text>
+          <text x="469" y="143" class="dg-t-sm" text-anchor="middle">GOP 2</text>
+          <line x1="220" y1="56" x2="220" y2="118" class="dg-line-bad"></line>
+          <text x="214" y="50" class="dg-t-crit" text-anchor="end">cut here</text>
+          <line x1="224" y1="168" x2="320" y2="168" class="dg-line-bad" marker-end="url(#ar1)"></line>
+          <text x="40" y="190" class="dg-t-crit">Mid-GOP: these P-frames reference data you threw away.</text>
+          <text x="40" y="206" class="dg-t-crit">Broken until the next I-frame, unless you re-encode.</text>
+          <line x1="328" y1="56" x2="328" y2="118" class="dg-line-key"></line>
+          <text x="334" y="50" class="dg-t-key">cut here</text>
+          <text x="372" y="190" class="dg-t-key">On the keyframe: copy the compressed bytes as-is.</text>
+          <text x="372" y="206" class="dg-t-key">No decode, no re-encode, nearly free.</text>
+        </svg>
+      </div>
+      <figcaption><b>Snap trims to keyframes and the cut is a copy.</b> Frame-accurate trimming requires re-encoding only the partial GOP at each edge, not the whole clip. Shortening the GOP buys finer cut granularity and costs file size, because I-frames are large. Volunteering that three-way tradeoff (keyframe interval against cut precision against bitrate) is a strong signal.</figcaption>
+    </figure>
+
+    <div class="stack">
+      <h3>3) Users can upload a clip and get a link</h3>
+      <p>The client calls <code>POST /clips</code>, receives a clip id plus presigned part URLs, uploads chunks directly to object storage, then calls <code>complete</code>. A storage event enqueues processing. <strong>Components added: API service, metadata database, object storage, job queue.</strong></p>
+
+      <h3>4) Users can watch a clip from that link</h3>
+      <p>Two separate moments, worth keeping distinct. <strong>When the transcode worker runs</strong> (before anyone watches) it writes rendition files to object storage, sets the rendition row to <code>ready</code>, and moves the clip's status to <code>ready</code>. <strong>When a viewer actually plays the clip</strong>, nothing in the database changes synchronously: the player reads from the CDN with a signed URL, and the view becomes an event that updates <code>view_count</code> in batches later. A viral clip must never turn into a write storm on the clips table. <strong>Components added: transcode workers, CDN.</strong></p>
+      <p>The important decision, which anticipates deep dive 3: <strong>produce one shareable rendition on ingest and generate the rest lazily on first playback.</strong> Most clips never get a first playback.</p>
+
+      <h3>5) Users can browse their library</h3>
+      <p>An indexed read against the metadata database, keyset paginated. <strong>Components added: read replicas.</strong> This is also where the schema question usually arrives, so have this ready:</p>
+    </div>
+
+    <pre class="code"><span class="c">-- Time-ordered ids: index locality, rough creation order for free,
+-- and nothing enumerable sitting in a public share URL.</span>
+<span class="k">create table</span> clips (
+  id            uuid <span class="k">primary key</span>,        <span class="c">-- UUIDv7</span>
+  public_slug   text <span class="k">unique not null</span>,    <span class="c">-- base62, what the URL shows</span>
+  owner_id      uuid <span class="k">not null references</span> users(id),
+  game_id       int  <span class="k">references</span> games(id), <span class="c">-- null = unrecognized game</span>
+  status        clip_status <span class="k">not null</span>,     <span class="c">-- pending_upload, uploaded, ready, failed</span>
+  visibility    visibility  <span class="k">not null default</span> 'private',
+  trigger_type  trigger_type <span class="k">not null</span>,    <span class="c">-- hotkey | auto | manual</span>
+  duration_ms   int <span class="k">not null</span>,
+  captured_at   timestamptz <span class="k">not null</span>,     <span class="c">-- client clock: may lag days, or lie</span>
+  uploaded_at   timestamptz,               <span class="c">-- server clock: the trustworthy one</span>
+  storage_tier  storage_tier <span class="k">not null default</span> 'hot',
+  capture_meta  jsonb,                     <span class="c">-- encoder, gpu, fps impact, dropped frames</span>
+  view_count    bigint <span class="k">not null default</span> 0, <span class="c">-- denormalized from the event stream</span>
+  deleted_at    timestamptz
+) <span class="k">partition by range</span> (captured_at);      <span class="c">-- monthly: expiry becomes DROP PARTITION</span>
+
+<span class="c">-- The dominant read, served by one composite index.</span>
+<span class="k">create index on</span> clips (owner_id, captured_at <span class="k">desc</span>, id <span class="k">desc</span>)
+  <span class="k">where</span> deleted_at <span class="k">is null</span>;
+
+<span class="c">-- Separate table, because we transcode lazily. As columns on clips,
+-- adding a rendition later would be a migration.</span>
+<span class="k">create table</span> clip_renditions (
+  clip_id     uuid <span class="k">not null references</span> clips(id) <span class="k">on delete cascade</span>,
+  label       text <span class="k">not null</span>,             <span class="c">-- '720p', '1080p', 'thumb'</span>
+  status      rendition_status <span class="k">not null</span>, <span class="c">-- absent | queued | ready | failed</span>
+  storage_key text,                       <span class="c">-- key, not URL: domains and signing change</span>
+  bytes       bigint,
+  <span class="k">primary key</span> (clip_id, label)
+);</pre>
+
+    <div class="stack">
+      <ul class="tight">
+        <li><strong>Two timestamps, deliberately.</strong> The client may have been offline for days, so capture time and upload time genuinely differ. Sort by <code>captured_at</code> because that is what the user remembers, but treat it as untrusted input from a clock you do not control and clamp bogus values against <code>uploaded_at</code>.</li>
+        <li><strong>Keyset pagination, never OFFSET.</strong> Users with ten thousand clips exist, and OFFSET degrades linearly for exactly the heavy users you least want to annoy.</li>
+        <li><strong>Views are denormalized.</strong> A row per view in your primary database is the wrong shape. Views go to the event pipeline; the counter is a read-optimized copy updated in batches.</li>
+      </ul>
+
+      <div class="callout">
+        <span class="tag">The datastore answer, and why it is the brave one</span>
+        <p>Postgres. One primary, read replicas, partitioned monthly. Candidates reach for Cassandra or DynamoDB reflexively whenever "video" appears, pattern-matching to scale that is not present. <strong>Point at your own estimate:</strong> 14 writes per second and a few hundred million rows a year sits comfortably in one well-indexed relational database, and you keep transactions and joins while the product is still figuring out what it is. Then name your own trigger for revisiting it: when index maintenance shows up in write latency. Choosing the boring option and stating the condition under which you would abandon it reads as judgment.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 04 ============ -->
+  <section id="dives">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">04</p>
+      <h2>Potential deep dives</h2>
+    </div>
+
+    <div class="stack">
+      <h3>1) How do we capture 60fps gameplay without costing the player framerate?</h3>
+      <p>The defining question of the problem. If you go deep on only one thing, go deep here.</p>
+    </div>
+
+    <div class="tiers">
+      <div class="tier bad">
+        <div class="tier-name"><span class="tier-badge">Bad</span><span class="tier-title">Screen-capture the desktop, encode on the CPU</span></div>
+        <dl class="tier-row"><dt>Approach</dt><dd>Grab the framebuffer with a general screen capture API, hand frames to a software encoder like x264.</dd></dl>
+        <dl class="tier-row"><dt>Challenges</dt><dd>Software encoding at 1080p60 costs <b>15 to 30% of framerate</b>, which violates the one requirement the product cannot violate. You are also competing with the game for CPU during exactly the moments it needs the most.</dd></dl>
+      </div>
+      <div class="tier ok">
+        <div class="tier-name"><span class="tier-badge">Good</span><span class="tier-title">Use the GPU's hardware encoder</span></div>
+        <dl class="tier-row"><dt>Approach</dt><dd>Route frames to NVENC, Quick Sync, or AMF instead of the CPU. Dedicated silicon, no contention for shader cores.</dd></dl>
+        <dl class="tier-row"><dt>Challenges</dt><dd>Correct, but incomplete. If you copy each frame to system RAM before handing it to the encoder, you have created a <b>500&nbsp;MB/s transfer across the PCIe bus</b> and most of the cost you were trying to avoid comes right back.</dd></dl>
+      </div>
+      <div class="tier great">
+        <div class="tier-name"><span class="tier-badge">Great</span><span class="tier-title">Keep the frame GPU-resident end to end</span></div>
+        <dl class="tier-row"><dt>Approach</dt><dd>Capture into a GPU texture and feed it straight to the hardware encoder. Only the <b>compressed</b> stream, about 1.25&nbsp;MB/s, ever crosses into system memory.</dd></dl>
+        <dl class="tier-row"><dt>Why it wins</dt><dd>Roughly <b>400x less data movement.</b> The line to say: <em>"the expensive part is the copy, not the encode."</em></dd></dl>
+      </div>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 760 316" role="img" aria-label="Two capture paths converging on the same ring buffer. The correct path keeps the frame inside GPU memory through capture and hardware encoding, emitting about 1.25 megabytes per second. The wrong path copies raw frames to system RAM at about 500 megabytes per second and encodes on the CPU.">
+          <defs>
+            <marker id="ar4k" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="dg-arrow-key"></path></marker>
+            <marker id="ar4b" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="dg-arrow-bad"></path></marker>
+          </defs>
+          <rect x="20" y="40" width="716" height="104" rx="4" class="dg-region"></rect>
+          <text x="32" y="60" class="dg-t-key">GPU MEMORY: the frame is already here</text>
+          <rect x="36" y="76" width="196" height="46" rx="3" class="dg-box"></rect>
+          <text x="134" y="104" class="dg-t" text-anchor="middle">Game renders frame</text>
+          <line x1="232" y1="99" x2="272" y2="99" class="dg-line-key" marker-end="url(#ar4k)"></line>
+          <rect x="276" y="76" width="160" height="46" rx="3" class="dg-box"></rect>
+          <text x="356" y="104" class="dg-t" text-anchor="middle">Capture</text>
+          <line x1="436" y1="99" x2="476" y2="99" class="dg-line-key" marker-end="url(#ar4k)"></line>
+          <rect x="480" y="76" width="240" height="46" rx="3" class="dg-box"></rect>
+          <text x="600" y="104" class="dg-t" text-anchor="middle">Hardware encoder (NVENC)</text>
+          <line x1="600" y1="144" x2="600" y2="196" class="dg-line-key" marker-end="url(#ar4k)"></line>
+          <text x="592" y="176" class="dg-t-key" text-anchor="end">compressed, ~1.25 MB/s</text>
+          <line x1="134" y1="144" x2="134" y2="196" class="dg-line-bad" marker-end="url(#ar4b)"></line>
+          <text x="142" y="170" class="dg-t-crit">raw frames, ~500 MB/s</text>
+          <text x="142" y="186" class="dg-t-crit">across the PCIe bus</text>
+          <rect x="36" y="200" width="196" height="46" rx="3" class="dg-box"></rect>
+          <text x="134" y="228" class="dg-t" text-anchor="middle">Copy to system RAM</text>
+          <line x1="232" y1="223" x2="272" y2="223" class="dg-line-bad" marker-end="url(#ar4b)"></line>
+          <rect x="276" y="200" width="160" height="46" rx="3" class="dg-box"></rect>
+          <text x="356" y="228" class="dg-t" text-anchor="middle">CPU encoder</text>
+          <line x1="436" y1="223" x2="476" y2="223" class="dg-line-bad" marker-end="url(#ar4b)"></line>
+          <rect x="480" y="200" width="240" height="46" rx="3" class="dg-box-key"></rect>
+          <text x="600" y="220" class="dg-t" text-anchor="middle">Ring buffer</text>
+          <text x="600" y="236" class="dg-t-sm" text-anchor="middle">last 60s, disk-backed</text>
+          <text x="20" y="280" class="dg-t-sm">Same input, same output, same buffer. The upper path never moves an uncompressed frame.</text>
+          <text x="20" y="298" class="dg-t-sm">That single difference is roughly 400x the data volume, and most of the cost a player would feel.</text>
+        </svg>
+      </div>
+      <figcaption><b>The number worth memorizing:</b> 1080p60 uncompressed is about 500&nbsp;MB/s (8.3&nbsp;MB per frame at 60&nbsp;fps); the same content at 10&nbsp;Mbps is about 1.25&nbsp;MB/s. One more thing to raise here: how you acquire the frame at all. Windows Graphics Capture is sanctioned and safe; hooking the game's D3D swap chain is lower latency but behaviorally indistinguishable from a cheat, which makes anti-cheat compatibility a real engineering and business constraint.</figcaption>
+    </figure>
+
+    <div class="stack">
+      <h3>2) How do we get 40&nbsp;MB off a residential uplink without ruining the game?</h3>
+    </div>
+
+    <div class="tiers">
+      <div class="tier bad">
+        <div class="tier-name"><span class="tier-badge">Bad</span><span class="tier-title">POST the file to the API server</span></div>
+        <dl class="tier-row"><dt>Approach</dt><dd>Client uploads the clip to your application tier, which writes it to storage.</dd></dl>
+        <dl class="tier-row"><dt>Challenges</dt><dd>Your servers now carry 48&nbsp;TB/day of video they do not need to touch. A dropped connection at 90% restarts from zero, and on a flaky connection it may never finish at all.</dd></dl>
+      </div>
+      <div class="tier ok">
+        <div class="tier-name"><span class="tier-badge">Good</span><span class="tier-title">Presigned multipart, direct to object storage</span></div>
+        <dl class="tier-row"><dt>Approach</dt><dd>Server issues signed part URLs; client uploads 5 to 8&nbsp;MB chunks in parallel, persisting progress to local disk so a crash or reboot resumes rather than restarts.</dd></dl>
+        <dl class="tier-row"><dt>Challenges</dt><dd>Solves reliability but not experience. A saturated uplink adds latency to the match the player is still in, and they wait the full upload before they can share.</dd></dl>
+      </div>
+      <div class="tier great">
+        <div class="tier-name"><span class="tier-badge">Great</span><span class="tier-title">Proxy-first upload with bandwidth-aware scheduling</span></div>
+        <dl class="tier-row"><dt>Approach</dt><dd>Encode a small 480p proxy on the client (the hardware encoder is right there and idle), upload <b>that</b> first so the share link is live in a few seconds, then upload the source in the background. Throttle to a fraction of measured uplink while a game is in the foreground, go full speed once they alt-tab.</dd></dl>
+        <dl class="tier-row"><dt>Why it wins</dt><dd>It attacks the actual product metric. Time-to-link stops being bounded by the source upload, and the player never loses a fight because their last clip was uploading.</dd></dl>
+      </div>
+    </div>
+
+    <div class="stack">
+      <h3>3) How do we avoid going bankrupt on storage?</h3>
+      <p>Do the arithmetic out loud first, because the conclusion drives everything after it.</p>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th scope="col">Step</th><th scope="col">Value</th><th scope="col">Note</th></tr></thead>
+        <tbody>
+          <tr><td class="what">Daily actives</td><td class="num">2M</td><td class="why">From 10M MAU.</td></tr>
+          <tr><td class="what">Clips per day</td><td class="num">1.2M</td><td class="why">20% of DAU save, 3 clips each.</td></tr>
+          <tr><td class="what">Source ingest</td><td class="num">~48 TB/day</td><td class="why">At 40 MB per clip.</td></tr>
+          <tr><td class="what">Write QPS</td><td class="num">~14/s</td><td class="why">Say this explicitly: the request rate is nothing, the bytes are everything.</td></tr>
+          <tr><td class="what">With renditions</td><td class="num">~100 TB/day</td><td class="why">Roughly 3 PB/month, accumulating.</td></tr>
+          <tr><td class="what">Hot-tier cost</td><td class="num">~$70k/mo</td><td class="why">Month one, growing every month. Order of magnitude, not a quote.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tiers">
+      <div class="tier bad">
+        <div class="tier-name"><span class="tier-badge">Bad</span><span class="tier-title">Full ABR ladder on ingest, keep everything forever</span></div>
+        <dl class="tier-row"><dt>Challenges</dt><dd>You pay to transcode and store four renditions of clips that, in the majority of cases, nobody will ever open. Cost grows monotonically and the free tier becomes unviable.</dd></dl>
+      </div>
+      <div class="tier ok">
+        <div class="tier-name"><span class="tier-badge">Good</span><span class="tier-title">Lifecycle rules and storage tiering</span></div>
+        <dl class="tier-row"><dt>Approach</dt><dd>Hot for 7 days, infrequent access to 90, then archive. Standard object-storage lifecycle policies.</dd></dl>
+        <dl class="tier-row"><dt>Challenges</dt><dd>Helps, but you are still paying to generate renditions nobody requested, and a flat timer deletes a treasured clip as readily as a dud.</dd></dl>
+      </div>
+      <div class="tier great">
+        <div class="tier-name"><span class="tier-badge">Great</span><span class="tier-title">Lazy transcode, engagement-driven retention, time-partitioned metadata</span></div>
+        <dl class="tier-row"><dt>Approach</dt><dd>One rendition on ingest, the rest generated on first playback and then cached. Retention driven by actual engagement rather than a timer. Source kept only for paid tiers. Content-hash dedup for re-uploaded viral clips. And because <code>clips</code> is partitioned by month, expiry is a <b>partition drop</b> rather than a mass delete.</dd></dl>
+        <dl class="tier-row"><dt>Why it wins</dt><dd>If most clips are never watched, lazy transcoding removes most of the transcode bill by construction, and the schema makes the retention policy cheap to actually execute.</dd></dl>
+      </div>
+    </div>
+
+    <div class="stack">
+      <h3>4) How do we operate a client on hardware we do not control?</h3>
+      <p>Not a bad/good/great, but the area where shipped-desktop-software experience shows. Naming two or three of these is a strong signal.</p>
+      <ul class="tight">
+        <li><strong>Hardware you did not choose.</strong> Some users have no hardware encoder. Some have three-year-old drivers. Laptops commonly have two GPUs and the game may be rendering on the one you are not capturing from. You need a capability probe at install and a defined degradation path, including telling a user honestly when their machine cannot run this well.</li>
+        <li><strong>Anti-cheat.</strong> Injecting into a game's render loop is behaviorally identical to what a cheat does. This is a business relationship as much as an engineering one: per-title handling, allowlisting, and actual conversations with vendors.</li>
+        <li><strong>You cannot hotfix.</strong> A backend bug is one deploy from fixed; a client bug is in the wild until users update, and some never will. Staged rollout by cohort, a server-controlled kill switch for the capture path, and server-driven config wherever possible.</li>
+        <li><strong>Observability is the client's job.</strong> You cannot attach a profiler to a stranger's gaming session. If the client does not self-report encoder failures, dropped frames, measured framerate impact, and upload success, you will learn that a driver update broke capture on a whole GPU family from your reviews.</li>
+      </ul>
+
+      <h3>5) How do we collect the data that makes auto-detection possible?</h3>
+      <p>Given that this role pairs the design round with an AI round, expect this one. The events worth capturing, and what each is really for:</p>
+      <ul class="tight">
+        <li><code>clip_trimmed</code> with original and final in/out points. <strong>The valuable one.</strong> A user who saves 60 seconds and trims to 9 has hand-labeled exactly where the interesting moment was, for free, without being asked.</li>
+        <li><code>clip_viewed</code> with watch percentage. Watch-through rate is your quality label.</li>
+        <li><code>clip_shared</code> and <code>clip_deleted</code>. Deletion within a minute of creation is a strong negative signal.</li>
+        <li>Capture health and pipeline latency, which protect the two requirements the product rests on.</li>
+      </ul>
+      <div class="callout data">
+        <span class="tag">The flywheel, stated plainly</span>
+        <p>Capture generously, let the user trim, record where they trimmed. Trim boundaries plus watch-through rates give you a labeled dataset of what a good gaming moment looks like, with no annotation budget and no labeling team. Train on it and auto-detection improves, so users trim less, so capture can be more generous. Also say where detection <em>runs</em>: on the client, over frames you already hold. Uploading video in order to decide whether it was worth uploading inverts the entire cost structure.</p>
+      </div>
+      <div class="callout trap">
+        <span class="tag">One sentence on consent</span>
+        <p>Gameplay clips capture Discord audio, other players' voices, and whatever else is on screen. That is a real requirement rather than a compliance footnote, and it sharpens the moment you propose retaining clips to train models on.</p>
+      </div>
+
+      <h3>Final design</h3>
+    </div>
+
+    <figure>
+      <div class="fig-scroll">
+        <svg viewBox="0 0 920 386" role="img" aria-label="End to end pipeline. The desktop client captures, buffers, trims and uploads directly to object storage. Storage events enqueue transcode work that produces renditions served by a CDN. A parallel event bus carries client, pipeline and playback events into a collector, stream and warehouse that feed ranking and model training.">
+          <defs>
+            <marker id="ar3" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="dg-arrow"></path></marker>
+            <marker id="ar3d" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="dg-arrow-data"></path></marker>
+          </defs>
+          <rect x="16" y="42" width="188" height="124" rx="3" class="dg-box-key"></rect>
+          <text x="110" y="62" class="dg-head" text-anchor="middle">DESKTOP CLIENT</text>
+          <line x1="28" y1="70" x2="192" y2="70" class="dg-line" opacity="0.5"></line>
+          <text x="30" y="88" class="dg-t">GPU capture + NVENC</text>
+          <text x="30" y="106" class="dg-t">Ring buffer, last 60s</text>
+          <text x="30" y="124" class="dg-t">Game detect + triggers</text>
+          <text x="30" y="142" class="dg-t">Trim UI + resumable upload</text>
+          <text x="30" y="159" class="dg-t-sm">the hard part lives here</text>
+          <line x1="204" y1="104" x2="246" y2="104" class="dg-line" marker-end="url(#ar3)"></line>
+          <text x="225" y="84" class="dg-t-lbl" text-anchor="middle">presigned</text>
+          <text x="225" y="97" class="dg-t-lbl" text-anchor="middle">multipart PUT</text>
+          <rect x="250" y="80" width="124" height="48" rx="3" class="dg-box"></rect>
+          <text x="312" y="100" class="dg-t" text-anchor="middle">Object storage</text>
+          <text x="312" y="116" class="dg-t-sm" text-anchor="middle">source clip lands</text>
+          <line x1="374" y1="104" x2="416" y2="104" class="dg-line" marker-end="url(#ar3)"></line>
+          <text x="395" y="92" class="dg-t-lbl" text-anchor="middle">event</text>
+          <rect x="420" y="80" width="104" height="48" rx="3" class="dg-box"></rect>
+          <text x="472" y="100" class="dg-t" text-anchor="middle">Job queue</text>
+          <text x="472" y="116" class="dg-t-sm" text-anchor="middle">fresh over backfill</text>
+          <line x1="524" y1="104" x2="566" y2="104" class="dg-line" marker-end="url(#ar3)"></line>
+          <rect x="570" y="80" width="140" height="48" rx="3" class="dg-box"></rect>
+          <text x="640" y="100" class="dg-t" text-anchor="middle">Transcode workers</text>
+          <text x="640" y="116" class="dg-t-sm" text-anchor="middle">idempotent, spot fleet</text>
+          <line x1="710" y1="104" x2="752" y2="104" class="dg-line" marker-end="url(#ar3)"></line>
+          <text x="731" y="84" class="dg-t-lbl" text-anchor="middle">720p now,</text>
+          <text x="731" y="97" class="dg-t-lbl" text-anchor="middle">rest lazily</text>
+          <rect x="756" y="80" width="148" height="48" rx="3" class="dg-box"></rect>
+          <text x="830" y="100" class="dg-t" text-anchor="middle">CDN + signed URLs</text>
+          <text x="830" y="116" class="dg-t-sm" text-anchor="middle">renditions, thumbs</text>
+          <line x1="60" y1="208" x2="836" y2="208" class="dg-line-data"></line>
+          <text x="448" y="200" class="dg-t-lbl" text-anchor="middle">EVENT BUS</text>
+          <line x1="110" y1="166" x2="110" y2="204" class="dg-line-data" marker-end="url(#ar3d)"></line>
+          <text x="118" y="186" class="dg-t-lbl">capture, trim, upload events</text>
+          <line x1="640" y1="128" x2="640" y2="204" class="dg-line-data" marker-end="url(#ar3d)"></line>
+          <text x="648" y="148" class="dg-t-lbl">pipeline latency</text>
+          <line x1="836" y1="128" x2="836" y2="204" class="dg-line-data" marker-end="url(#ar3d)"></line>
+          <text x="828" y="148" class="dg-t-lbl" text-anchor="end">playback, watch %</text>
+          <line x1="60" y1="208" x2="60" y2="262" class="dg-line-data" marker-end="url(#ar3d)"></line>
+          <rect x="16" y="266" width="152" height="50" rx="3" class="dg-box-data"></rect>
+          <text x="92" y="286" class="dg-t" text-anchor="middle">Event collector</text>
+          <text x="92" y="302" class="dg-t-sm" text-anchor="middle">schema validated</text>
+          <line x1="168" y1="291" x2="212" y2="291" class="dg-line-data" marker-end="url(#ar3d)"></line>
+          <rect x="216" y="266" width="136" height="50" rx="3" class="dg-box-data"></rect>
+          <text x="284" y="286" class="dg-t" text-anchor="middle">Stream</text>
+          <text x="284" y="302" class="dg-t-sm" text-anchor="middle">real-time + batch</text>
+          <line x1="352" y1="291" x2="396" y2="291" class="dg-line-data" marker-end="url(#ar3d)"></line>
+          <rect x="400" y="266" width="136" height="50" rx="3" class="dg-box-data"></rect>
+          <text x="468" y="286" class="dg-t" text-anchor="middle">Warehouse</text>
+          <text x="468" y="302" class="dg-t-sm" text-anchor="middle">clips + engagement</text>
+          <line x1="536" y1="291" x2="580" y2="291" class="dg-line-data" marker-end="url(#ar3d)"></line>
+          <rect x="584" y="266" width="252" height="50" rx="3" class="dg-box-data"></rect>
+          <text x="710" y="286" class="dg-t" text-anchor="middle">Feed ranking + highlight training set</text>
+          <text x="710" y="302" class="dg-t-sm" text-anchor="middle">trims and watch-through are the labels</text>
+          <text x="16" y="350" class="dg-t-sm">Upper lane carries bytes. Lower lane carries the signal that makes auto-detection possible.</text>
+          <text x="16" y="368" class="dg-t-sm">Metadata DB and read replicas sit behind the API, omitted here for clarity.</text>
+        </svg>
+      </div>
+      <figcaption><b>Two lanes.</b> Video bytes never pass through your application servers. The lower lane is the one most candidates leave out entirely, and for a company pairing this round with an AI round, it is probably the lane they most want to hear about.</figcaption>
+    </figure>
+
+    <div class="stack">
+      <h3>Additional deep dives you might consider</h3>
+      <ul class="tight">
+        <li>Deduplicating the same viral clip re-uploaded by thousands of users, by content hash.</li>
+        <li>Cold start for a newly released game with no detection heuristics yet.</li>
+        <li>Thumbnail and sprite-sheet generation for scrub previews.</li>
+        <li>Abuse and moderation on public clips, given that you host user video.</li>
+        <li>Quota enforcement and reconciling a denormalized <code>storage_used_bytes</code> that will drift.</li>
+        <li>Sweeping clips stranded in <code>pending_upload</code> by a client that crashed between the hotkey and the first byte.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============ 05 ============ -->
+  <section id="levels">
+    <div class="sec-head">
+      <div class="ruler"></div>
+      <p class="sec-label">05</p>
+      <h2>What is expected at each level</h2>
+    </div>
+
+    <div class="levels">
+      <div class="level you">
+        <div class="level-head"><h4>Mid-level</h4><span class="level-you-tag">You are here</span></div>
+        <p><strong>Breadth over depth.</strong> You are expected to produce a complete, working end-to-end design and to follow the interviewer competently into one or two deep dives. They will drive; you are not penalized for that.</p>
+        <ul>
+          <li>Get to a coherent design covering all five functional requirements without stalling.</li>
+          <li>Know that capture is client-side and be able to say <b>why that changes things</b>, even if you cannot go three levels deep on encoders.</li>
+          <li>Do the estimation and reach the storage conclusion.</li>
+          <li>Do not need to be told that video bytes should not flow through your API tier.</li>
+          <li><b>The bar you can clear with two days of prep:</b> know the hardware encoder exists and why it matters, and know that lazy transcoding is the cost lever. Those two facts carry most of the signal.</li>
+        </ul>
+      </div>
+      <div class="level">
+        <div class="level-head"><h4>Senior</h4></div>
+        <p><strong>Depth, self-directed.</strong> You are expected to identify the hard parts yourself rather than waiting to be pointed at them.</p>
+        <ul>
+          <li>Volunteer the framerate constraint before being asked, and design around it.</li>
+          <li>Raise cost unprompted and connect it to concrete mechanisms (lazy transcode, partition-based expiry).</li>
+          <li>Defend Postgres over a distributed store <b>using your own QPS number</b>, and name the condition that would change your mind.</li>
+          <li>Handle failure modes without prompting: crashed uploads, orphaned records, stuck transcodes.</li>
+        </ul>
+      </div>
+      <div class="level">
+        <div class="level-head"><h4>Staff+</h4></div>
+        <p><strong>Scoping and organizational judgment.</strong> You are expected to reframe the problem, not just solve the stated one.</p>
+        <ul>
+          <li>Identify that the client is the product and the backend is largely commodity, then allocate the hour accordingly.</li>
+          <li>Talk about rollout risk, kill switches, and anti-cheat as a vendor relationship rather than a technical detail.</li>
+          <li>Connect the event pipeline to the ML roadmap, and articulate the flywheel as a strategy rather than a feature.</li>
+          <li>Say what you would build first and what you would deliberately not build for a year.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ A1 ============ -->
+  <section id="ai">
+    <div class="sec-head">
+      <p class="appendix-mark">Appendix 1</p>
+      <h2>The 30-minute AI prototyping round</h2>
+    </div>
+    <div class="stack">
+      <p>Not part of the breakdown format, but it is half your Wednesday. You are scored on <strong>how you drive the tool</strong>, not on how much it produces.</p>
+      <h4>Before the call</h4>
+      <ul class="tight">
+        <li><strong>Have a warm scaffold.</strong> A repo that already boots, dependencies installed, dev server confirmed running. Six of your thirty minutes spent on project init is a self-inflicted wound.</li>
+        <li><strong>Confirm the rules today,</strong> not Wednesday morning: your machine or theirs, your tools or a prescribed one, screen share or shared editor.</li>
+        <li><strong>Pick a stack you know cold,</strong> not the most impressive one. You need to spot bad generated code in seconds.</li>
+      </ul>
+      <h4>During</h4>
+      <ul class="tight">
+        <li><strong>Spend the first two minutes not coding.</strong> State the vertical slice, what you are cutting, and what "done" looks like at minute 30.</li>
+        <li><strong>Vertical slice, never horizontal.</strong> Load a video, set in and out points, produce a trimmed output. Not auth, feed, profile, and settings all half-built.</li>
+        <li><strong>Narrate your prompting.</strong> Why that context, why that scope constraint, why you are rejecting that output. The reasoning is the artifact being evaluated.</li>
+        <li><strong>Never let the agent run in silence.</strong> Two minutes of dead air is the worst available use of the clock.</li>
+        <li><strong>Read the diff before accepting it,</strong> out loud. The failure they are screening for is accepting whatever the model emitted without understanding it.</li>
+        <li><strong>Know when to stop prompting and type.</strong> If the agent misses the same thing twice, write it yourself.</li>
+        <li><strong>Hard stop at minute 20.</strong> Stop adding, start making what exists actually run.</li>
+      </ul>
+      <div class="callout">
+        <span class="tag">Likely prompts, given the company</span>
+        <p>A clip trimmer with in and out points over an HTML5 video element. A clip grid with thumbnails. A "score this clip" tool calling a model over frames or a transcript. A rolling buffer demo in the browser using <code>MediaRecorder</code>. Build a throwaway version of one tonight; the muscle memory transfers even if the actual prompt differs.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ A2 ============ -->
+  <section id="plan">
+    <div class="sec-head">
+      <p class="appendix-mark">Appendix 2</p>
+      <h2>Your next 48 hours</h2>
+    </div>
+
+    <div class="phases">
+      <div class="phase">
+        <span class="phase-when">Mon eve</span>
+        <div class="phase-body">
+          <h4>Sections 01 through 03</h4>
+          <p>The test for tonight: can you state the six non-functional requirements from memory, and redraw the final architecture on a blank page? Do not read section 04 yet.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <span class="phase-when">Mon late</span>
+        <div class="phase-body">
+          <h4>Build the throwaway trimmer</h4>
+          <p>Forty-five minutes, no more. A page that loads a local video, lets you drag in and out points, and logs the range. You get domain familiarity and a warm scaffold for Wednesday's second round in one sitting.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <span class="phase-when">Tue AM</span>
+        <div class="phase-body">
+          <h4>Mock round one, cold</h4>
+          <p>Say <b>"mock me"</b>. I run the full 45 minutes in character, push back where a real interviewer would, and score you against the mid-level bar in section 05. Expect it to be uncomfortable, which is the point of doing it Tuesday.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <span class="phase-when">Tue PM</span>
+        <div class="phase-body">
+          <h4>Deep dives, then mock again</h4>
+          <p>Read section 04 properly, then a second run with harder pushback steered into whatever went badly in the morning.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <span class="phase-when">Tue eve</span>
+        <div class="phase-body">
+          <h4>Prep the AI round</h4>
+          <p>Scaffold booting, keys in place, tools configured, one 30-minute timed practice build so Wednesday is a repeat rather than a first attempt.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <span class="phase-when">Wed AM</span>
+        <div class="phase-body">
+          <h4>Three things only</h4>
+          <p>The six non-functional requirements, the estimation table in deep dive 3, and the mid-level bar in section 05. Nothing else. Cramming vocabulary an hour beforehand crowds out structure, and structure is what gets scored.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="stack">
+      <p>One last thing worth internalizing. You are mid-level with no video background, and neither is a problem as long as you do not pretend otherwise. <strong>"I have not built a capture pipeline, so let me reason from the constraint and correct me where I go wrong"</strong> is a strong sentence. It invites the interviewer into the design, makes your wrong turns cheap, and is exactly how a good engineer behaves in week one of an unfamiliar domain, which is what the interview is trying to predict.</p>
+      <p class="eyebrow">Say "mock me" when you are ready.</p>
+    </div>
+  </section>
+
+</div>
