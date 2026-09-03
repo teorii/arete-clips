@@ -58,3 +58,77 @@ def test_discard_local_tolerates_missing_files(tmp_path):
     present = touch(tmp_path / "there.mp4")
     Uploader._discard_local(present, tmp_path / "gone.jpg", None)
     assert not present.exists()
+
+
+def test_discard_all_removes_held_clips_and_their_files(tmp_path):
+    staging = tmp_path / "clips_out"
+    first = touch(staging / "a.mp4")
+    poster = touch(staging / "a.jpg")
+    second = touch(staging / "b.mp4")
+
+    uploader = make_uploader(tmp_path)
+    uploader.journal_path.write_text(
+        json.dumps([
+            {"mp4_path": str(first), "thumb_path": str(poster), "awaiting_user": True},
+            {"mp4_path": str(second), "thumb_path": None, "awaiting_user": True},
+        ]),
+        encoding="utf-8",
+    )
+
+    assert uploader.discard_all() == 2
+    assert not first.exists() and not poster.exists() and not second.exists()
+    assert uploader.waiting() == []
+
+
+def test_discard_all_spares_uploads_that_merely_failed(tmp_path):
+    """A failed upload is the journal doing its job. Clearing held clips must
+    not throw away a clip that is still trying to reach the server."""
+    staging = tmp_path / "clips_out"
+    held = touch(staging / "held.mp4")
+    failed = touch(staging / "failed.mp4")
+
+    uploader = make_uploader(tmp_path)
+    uploader.journal_path.write_text(
+        json.dumps([
+            {"mp4_path": str(held), "thumb_path": None, "awaiting_user": True},
+            {"mp4_path": str(failed), "thumb_path": None, "awaiting_user": False},
+        ]),
+        encoding="utf-8",
+    )
+
+    assert uploader.discard_all() == 1
+    assert not held.exists()
+    assert failed.exists(), "discarded a clip that was still pending upload"
+    assert [e["mp4_path"] for e in uploader._load()] == [str(failed)]
+
+
+def test_renaming_a_held_clip_sticks(tmp_path):
+    staging = tmp_path / "clips_out"
+    clip = touch(staging / "c.mp4")
+    uploader = make_uploader(tmp_path)
+    uploader.journal_path.write_text(
+        json.dumps([{"mp4_path": str(clip), "thumb_path": None,
+                     "awaiting_user": True, "title": "League of Legends"}]),
+        encoding="utf-8",
+    )
+
+    assert uploader.rename(str(clip), "Baron steal") is True
+    assert uploader.waiting()[0]["title"] == "Baron steal"
+
+
+def test_renaming_to_nothing_clears_the_title(tmp_path):
+    staging = tmp_path / "clips_out"
+    clip = touch(staging / "d.mp4")
+    uploader = make_uploader(tmp_path)
+    uploader.journal_path.write_text(
+        json.dumps([{"mp4_path": str(clip), "thumb_path": None,
+                     "awaiting_user": True, "title": "something"}]),
+        encoding="utf-8",
+    )
+
+    uploader.rename(str(clip), "   ")
+    assert uploader.waiting()[0]["title"] is None
+
+
+def test_renaming_an_unknown_clip_reports_failure(tmp_path):
+    assert make_uploader(tmp_path).rename("nope.mp4", "x") is False

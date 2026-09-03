@@ -28,6 +28,10 @@ class CaptureSettings(BaseSettings):
     # else is an exact dshow device name.
     audio_device: str = "auto"
 
+    # Off by default: capturing and publishing are separate decisions. The
+    # hotkey keeps the moment, and a link is asked for afterwards.
+    auto_upload: bool = False
+
     capture_fps: int = 60
     capture_bitrate: str = "12M"
     # Which desktop output the Desktop Duplication API should grab.

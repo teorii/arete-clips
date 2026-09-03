@@ -47,7 +47,7 @@ import webview  # noqa: E402
 
 from branding import APP_ID, APP_NAME  # noqa: E402
 from capture.daemon import Daemon  # noqa: E402
-from capture.hotkey import pump  # noqa: E402
+from capture.hotkey import pump, stop as hotkey_stop  # noqa: E402
 from paths import bundle_dir, config_file, is_configured  # noqa: E402
 from setup import SetupApi, setup_page  # noqa: E402
 from tray import Tray  # noqa: E402
@@ -216,6 +216,13 @@ class ApiServer:
         self.thread.join(timeout=5)
 
 
+# Only the keys settings offers, so the log names what the user chose.
+_KEY_NAMES = {
+    0x75: "F6", 0x76: "F7", 0x77: "F8", 0x78: "F9",
+    0x79: "F10", 0x7A: "F11", 0x7B: "F12",
+}
+
+
 class CaptureService:
     """Ring buffer plus hotkey pump, on their own thread.
 
@@ -234,7 +241,7 @@ class CaptureService:
 
     def __init__(
         self,
-        on_clip: Callable[[str | None], None] | None = None,
+        on_clip: Callable[[dict], None] | None = None,
         on_health: Callable[[bool, str], None] | None = None,
     ) -> None:
         self.daemon: Daemon | None = None
@@ -245,6 +252,7 @@ class CaptureService:
         # Distinguishes a deliberate shutdown from the capture process dying,
         # so the watchdog does not fight teardown by restarting ffmpeg.
         self._stopping = threading.Event()
+        self._pump_thread_id = 0
         self.thread = threading.Thread(target=self._run, name="capture", daemon=True)
         self.watchdog = threading.Thread(
             target=self._watch, name="capture-watchdog", daemon=True
@@ -255,10 +263,19 @@ class CaptureService:
             self.daemon = Daemon()
             self.daemon.drain_journal()
             self.daemon.start_buffer()
-            print(f"Hotkey armed: press F9 for the last {self.daemon.s.clip_seconds}s")
             self.ready.set()
             self.watchdog.start()
-            pump(self.daemon.s.hotkey_vk, self._on_hotkey)
+
+            def armed(thread_id: int) -> None:
+                # Only now is the key actually bound. Announcing it earlier
+                # claimed success the code had not earned, which made a failed
+                # binding look like a hotkey that simply did nothing.
+                self._pump_thread_id = thread_id
+                key = self.daemon.s.hotkey_vk
+                name = _KEY_NAMES.get(key, f"vk {key:#04x}")
+                print(f"Hotkey armed: {name} clips the last {self.daemon.s.clip_seconds}s")
+
+            pump(self.daemon.s.hotkey_vk, self._on_hotkey, on_ready=armed)
         except Exception as exc:  # noqa: BLE001
             # Capture can fail for reasons the app should survive: no NVENC, a
             # missing ffmpeg, a display index that no longer exists, or the
@@ -320,9 +337,9 @@ class CaptureService:
     def _make_clip(self) -> None:
         if self.daemon is None:
             return
-        url = self.daemon.make_clip()
+        result = self.daemon.make_clip()
         if self._on_clip is not None:
-            self._on_clip(url)
+            self._on_clip(result)
 
     def trigger(self) -> None:
         """Take a clip now. Used by both the hotkey and the tray menu."""
@@ -336,6 +353,8 @@ class CaptureService:
 
     def stop(self) -> None:
         self._stopping.set()
+        # Release the hotkey too, or a rebind leaves the old key still firing.
+        hotkey_stop(self._pump_thread_id)
         if self.daemon is not None:
             self.daemon.ring.stop()
 
@@ -466,11 +485,16 @@ def main() -> int:
     quitting = threading.Event()
     hinted = threading.Event()
 
-    def on_clip_done(url: str | None) -> None:
+    def on_clip_done(result: dict) -> None:
         if tray is None:
             return
-        if url:
-            tray.notify(f"Clip saved and link copied: {url}")
+        status = (result or {}).get("status")
+        if status == "uploaded":
+            tray.notify(f"Clip saved and link copied: {result['url']}")
+        elif status == "held":
+            tray.notify("Clip saved. Open Arete to generate a link.")
+        elif status == "busy":
+            return
         else:
             tray.notify("Clip failed. See the log for the reason.")
 
@@ -484,6 +508,34 @@ def main() -> int:
     if configured and not args.no_capture:
         capture.start()
 
+    # A mutable holder: the capture service is replaced when settings change,
+    # and the tray callbacks close over this rather than a stale instance.
+    services = {"capture": capture}
+
+    def apply_settings() -> None:
+        """Re-read config and rebuild capture, then return to the app."""
+        old_service = services["capture"]
+        old_service.stop()
+        fresh = CaptureService(on_clip=on_clip_done, on_health=on_health)
+        services["capture"] = fresh
+        if not args.no_capture:
+            fresh.start()
+        window.resize(1280, 820)
+        window.load_url(app_url())
+
+    def open_settings() -> None:
+        window.load_url(setup_page())
+        window.show()
+        window.restore()
+
+    setup_api = SetupApi(
+        on_saved=(apply_settings if configured else None) or (lambda: None),
+        on_skipped=lambda: window.load_url(app_url()),
+        # Resolved on each call: the capture service is replaced when settings
+        # change, and its uploader with it.
+        uploader_factory=lambda: services["capture"].daemon.uploader,
+    )
+
     if configured:
         window = webview.create_window(
             APP_NAME,
@@ -492,6 +544,7 @@ def main() -> int:
             height=820,
             min_size=(880, 560),
             background_color="#0b0e14",
+            js_api=setup_api,
         )
     else:
         # Nothing is configured yet, so there is no server to point a window at
@@ -511,7 +564,8 @@ def main() -> int:
             quitting.set()
             window.destroy()
 
-        setup_api = SetupApi(on_saved=finish_setup, on_skipped=abandon_setup)
+        setup_api._on_saved = finish_setup
+        setup_api._on_skipped = abandon_setup
         window = webview.create_window(
             f"{APP_NAME} setup",
             setup_page(),
@@ -532,10 +586,15 @@ def main() -> int:
             # Stop the recorder before tearing down the UI. If window.destroy()
             # ever stalls, the finally block never runs, and a stranded ffmpeg
             # would keep writing segments with nothing left to flush them.
-            capture.stop()
+            services["capture"].stop()
             window.destroy()
 
-        tray = Tray(on_open=show_window, on_clip=capture.trigger, on_quit=quit_app)
+        tray = Tray(
+            on_open=show_window,
+            on_clip=lambda: services["capture"].trigger(),
+            on_quit=quit_app,
+            on_settings=open_settings,
+        )
 
         def on_closing() -> bool:
             """Hide instead of quitting.
@@ -586,7 +645,7 @@ def main() -> int:
     finally:
         if tray is not None:
             tray.stop()
-        capture.stop()
+        services["capture"].stop()
         if api is not None:
             api.stop()
     return 0

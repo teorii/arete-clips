@@ -13,11 +13,32 @@ second one.
 
 from __future__ import annotations
 
+import base64
 import re
 from collections.abc import Callable
 from pathlib import Path
 
 from paths import bundle_dir, config_file
+
+
+def _thumbnail_data_uri(path: str | None) -> str | None:
+    """Inline the poster frame.
+
+    A held clip only exists on this machine, so its thumbnail has no URL to
+    serve it from. Inlining is what lets it look like any other card in the
+    library instead of an empty box, and a poster frame is small enough that
+    passing a few through the bridge costs nothing.
+    """
+    if not path:
+        return None
+    file = Path(path)
+    if not file.exists():
+        return None
+    try:
+        encoded = base64.b64encode(file.read_bytes()).decode("ascii")
+    except OSError:
+        return None
+    return f"data:image/jpeg;base64,{encoded}"
 
 
 def setup_page() -> str:
@@ -42,6 +63,7 @@ def write_config(values: dict[str, object]) -> Path:
         "CLIP_SECONDS": str(seconds),
         # Enough headroom that a clip is never cut short by the ring wrapping.
         "BUFFER_SECONDS": str(max(60, seconds * 2)),
+        "HOTKEY_VK": str(values.get("hotkey", "0x78")),
     }
 
     text = existing
@@ -57,22 +79,114 @@ def write_config(values: dict[str, object]) -> Path:
     return path
 
 
-class SetupApi:
+class AppBridge:
+    """Everything the pages can call, exposed as `pywebview.api`.
+
+    Attached to the one window the app owns, so both the setup page and the
+    clip library reach it. The library needs it because held clips live on this
+    machine and the server has never heard of them: a Generate link button has
+    to reach the client, not the API.
+    """
+
+    def __init__(self, uploader_factory=None):
+        self._uploader_factory = uploader_factory
+
+    def _uploader(self):
+        if self._uploader_factory is None:
+            raise RuntimeError("no uploader is available yet")
+        return self._uploader_factory()
+
+    def held_clips(self) -> list[dict]:
+        """Clips captured on this machine that have no link yet."""
+        try:
+            entries = self._uploader().waiting()
+        except Exception:  # noqa: BLE001
+            return []
+        return [
+            {
+                "path": entry["mp4_path"],
+                "capturedAt": entry.get("captured_at"),
+                "durationMs": entry.get("duration_ms", 0),
+                "bytes": entry.get("source_bytes", 0),
+                "title": entry.get("title"),
+                "thumb": _thumbnail_data_uri(entry.get("thumb_path")),
+            }
+            for entry in entries
+        ]
+
+    def generate_link(self, path: str) -> dict:
+        try:
+            return {"ok": True, "url": self._uploader().publish(path)}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "message": str(exc)}
+
+    def rename_clip(self, path: str, title: str) -> dict:
+        try:
+            found = self._uploader().rename(path, title)
+            return {"ok": found, "message": "" if found else "clip is no longer held"}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "message": str(exc)}
+
+    def discard_all_clips(self) -> dict:
+        try:
+            return {"ok": True, "removed": self._uploader().discard_all()}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "message": str(exc)}
+
+    def discard_clip(self, path: str) -> dict:
+        try:
+            self._uploader().discard(path)
+            return {"ok": True}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "message": str(exc)}
+
+
+class SetupApi(AppBridge):
     """Bridge exposed to the setup page as `pywebview.api`."""
 
-    def __init__(self, on_saved: Callable[[], None], on_skipped: Callable[[], None]):
+    def __init__(
+        self,
+        on_saved: Callable[[], None],
+        on_skipped: Callable[[], None],
+        uploader_factory=None,
+    ):
+        super().__init__(uploader_factory)
         self._on_saved = on_saved
         self._on_skipped = on_skipped
         self.saved = False
 
     def probe(self) -> dict:
         from capture.probe import gpu_name, has_nvenc, list_displays
+        from capture.windows import visible_windows
 
-        displays = list_displays()
+        try:
+            programs = visible_windows()
+        except OSError:
+            programs = []
+
         return {
             "encoder_ok": has_nvenc(),
             "gpu": gpu_name(),
-            "displays": displays,
+            "displays": list_displays(),
+            # Capture is per display, so a program is just a friendlier way of
+            # naming one. Resolved here rather than in the page.
+            "programs": programs,
+            "current": self.current(),
+        }
+
+    def current(self) -> dict:
+        """Existing settings, so the screen opens on what is configured."""
+        from capture.config import CaptureSettings, get_capture_settings
+
+        get_capture_settings.cache_clear()
+        CaptureSettings.model_config["env_file"] = str(config_file())
+        settings = get_capture_settings()
+        return {
+            "url": settings.api_base_url,
+            "key": settings.arete_api_key,
+            "display": settings.ddagrab_output_idx,
+            "seconds": settings.clip_seconds,
+            "hotkey": f"0x{settings.hotkey_vk:02X}",
         }
 
     def test(self, url: str, key: str) -> dict:

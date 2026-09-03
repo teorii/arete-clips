@@ -33,6 +33,9 @@ class PendingUpload:
     source_bytes: int
     capture_meta: dict
     title: str | None = None
+    # True while the clip is waiting for someone to ask for a link. Distinct
+    # from a failed upload, which should be retried on its own.
+    awaiting_user: bool = False
 
 
 class UploadError(RuntimeError):
@@ -81,6 +84,97 @@ class Uploader:
 
     # --------------------------------------------------------------- upload
 
+    def hold(
+        self,
+        clip: ClipResult,
+        captured_at: datetime,
+        capture_meta: dict,
+        title: str | None = None,
+    ) -> str:
+        """Keep a clip locally without uploading it.
+
+        Capture and publishing are separate decisions: most clips are worth
+        keeping for a minute and never worth sharing, and uploading every one
+        spends bandwidth during the game to store things nobody asked for.
+        """
+        pending = self._pending_from(clip, captured_at, capture_meta, title)
+        pending.awaiting_user = True
+        self._enqueue(pending)
+        return pending.mp4_path
+
+    def _pending_from(
+        self,
+        clip: ClipResult,
+        captured_at: datetime,
+        capture_meta: dict,
+        title: str | None,
+    ) -> PendingUpload:
+        return PendingUpload(
+            mp4_path=str(clip.mp4_path),
+            thumb_path=str(clip.thumb_path) if clip.thumb_path else None,
+            duration_ms=clip.duration_ms,
+            captured_at=captured_at.astimezone(timezone.utc).isoformat(),
+            content_hash=clip.content_hash,
+            source_bytes=clip.size_bytes,
+            capture_meta=capture_meta,
+            title=title,
+        )
+
+    def waiting(self) -> list[dict]:
+        """Clips held locally, newest first."""
+        entries = [e for e in self._load() if e.get("awaiting_user")]
+        entries.sort(key=lambda e: e.get("captured_at", ""), reverse=True)
+        return entries
+
+    def publish(self, mp4_path: str) -> str:
+        """Upload one held clip and return its share URL."""
+        for entry in self._load():
+            if entry.get("mp4_path") == mp4_path:
+                pending = PendingUpload(**entry)
+                pending.awaiting_user = False
+                return self._send(pending)
+        raise UploadError("that clip is no longer waiting to be shared")
+
+    def discard(self, mp4_path: str) -> None:
+        """Drop a held clip and delete its files."""
+        for entry in self._load():
+            if entry.get("mp4_path") == mp4_path:
+                self._discard_local(
+                    Path(entry["mp4_path"]),
+                    Path(entry["thumb_path"]) if entry.get("thumb_path") else None,
+                )
+        self._dequeue(mp4_path)
+
+    def rename(self, mp4_path: str, title: str | None) -> bool:
+        """Retitle a held clip.
+
+        Stored on the journal entry, so the name travels with the clip and is
+        what the server is told when a link is finally generated. Renaming
+        before sharing is the point: the game name the app guessed is a
+        starting point, not the description you want on the link.
+        """
+        entries = self._load()
+        cleaned = (title or "").strip() or None
+        for entry in entries:
+            if entry.get("mp4_path") == mp4_path:
+                entry["title"] = cleaned
+                self._save(entries)
+                return True
+        return False
+
+    def discard_all(self) -> int:
+        """Drop every held clip. Returns how many went.
+
+        Failed uploads are left alone: those are the journal doing its job, and
+        losing them would defeat the point of having one.
+        """
+        removed = 0
+        for entry in list(self._load()):
+            if entry.get("awaiting_user"):
+                self.discard(entry["mp4_path"])
+                removed += 1
+        return removed
+
     def submit(
         self,
         clip: ClipResult,
@@ -106,6 +200,8 @@ class Uploader:
         shared: list[str] = []
         for entry in self._load():
             pending = PendingUpload(**entry)
+            if pending.awaiting_user:
+                continue  # held on purpose, not a failure to retry
             if not Path(pending.mp4_path).exists():
                 self._dequeue(pending.mp4_path)  # local file is gone, drop it
                 continue

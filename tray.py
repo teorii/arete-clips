@@ -29,16 +29,19 @@ class Tray:
         on_open: Callable[[], None],
         on_clip: Callable[[], None],
         on_quit: Callable[[], None],
+        on_settings: Callable[[], None] | None = None,
     ) -> None:
         self._on_open = on_open
         self._on_clip = on_clip
         self._on_quit = on_quit
+        self._on_settings = on_settings
         self.recording = True
 
         menu = pystray.Menu(
             # default=True makes this fire on a double-click of the icon.
             pystray.MenuItem(f"Open {APP_NAME}", self._open, default=True),
-            pystray.MenuItem("Clip the last 30 seconds", self._clip),
+            pystray.MenuItem("Clip now", self._clip),
+            pystray.MenuItem("Settings", self._settings),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(self._status_text, None, enabled=False),
             pystray.Menu.SEPARATOR,
@@ -61,6 +64,10 @@ class Tray:
 
     def _clip(self, _icon=None, _item=None) -> None:
         self._on_clip()
+
+    def _settings(self, _icon=None, _item=None) -> None:
+        if self._on_settings is not None:
+            self._on_settings()
 
     def _quit(self, _icon=None, _item=None) -> None:
         self._on_quit()

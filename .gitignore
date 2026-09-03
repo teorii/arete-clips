@@ -35,3 +35,5 @@ dist/
 # packaged builds
 dist_app/
 build_app/
+dist_onefile/
+build_onefile/

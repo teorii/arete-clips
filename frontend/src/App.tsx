@@ -10,7 +10,10 @@ import {
   thumbnailUrl,
   trimClip,
 } from './api'
+import { type HeldClip } from './bridge'
 import { ClipDetail } from './ClipDetail'
+import { EditableTitle } from './EditableTitle'
+import { useHeldClips } from './useHeldClips'
 import { type RecentLink, clearRecent, loadRecent, pushRecent } from './recentLinks'
 import { type Filter, useClips } from './useClips'
 
@@ -26,6 +29,33 @@ export default function App() {
   const { items, loading, error, hasMore, loadMore, refresh, replace, remove } = useClips(
     search,
     filter,
+  )
+  const { held, heldBytes, busy, generate, discard, discardAll, rename } = useHeldClips()
+
+  // Held clips are hidden by a search or the pinned filter: neither can apply
+  // to something the server has never seen.
+  const showHeld = held.length > 0 && !search && filter === 'all'
+
+  const shareHeld = useCallback(
+    async (clip: HeldClip) => {
+      setToast('Uploading...')
+      const result = await generate(clip)
+      if (!result.ok || !result.url) {
+        setToast(result.message ?? 'Could not generate a link')
+        return
+      }
+      const copied = await copyText(result.url)
+      setRecent(
+        pushRecent({
+          slug: result.url.split('/').pop() ?? result.url,
+          url: result.url,
+          title: 'New clip',
+        }),
+      )
+      setToast(copied ? 'Link copied' : `Link ready: ${result.url}`)
+      refresh()
+    },
+    [generate, refresh],
   )
 
   // Debounce so typing does not fire a request per keystroke.
@@ -198,6 +228,19 @@ export default function App() {
         </section>
       )}
 
+      {showHeld && (
+        <div className={`held-bar${heldBytes > 2_000_000_000 ? ' heavy' : ''}`}>
+          <strong>{held.length}</strong>
+          <span>
+            clip{held.length === 1 ? '' : 's'} on this PC, not shared yet
+          </span>
+          <span className="mono">{(heldBytes / 1_073_741_824).toFixed(2)} GB</span>
+          <button className="ghost" disabled={busy !== null} onClick={() => void discardAll()}>
+            {busy === 'all' ? 'Discarding...' : 'Discard all'}
+          </button>
+        </div>
+      )}
+
       {error && (
         <div className="error">
           {error}
@@ -207,7 +250,7 @@ export default function App() {
         </div>
       )}
 
-      {!loading && items.length === 0 && !error ? (
+      {!loading && items.length === 0 && held.length === 0 && !error ? (
         <div className="empty">
           {search || filter === 'pinned'
             ? 'No clips match that.'
@@ -215,6 +258,17 @@ export default function App() {
         </div>
       ) : (
         <div className="grid">
+          {showHeld &&
+            held.map((clip) => (
+              <HeldCard
+                key={clip.path}
+                clip={clip}
+                busy={busy === clip.path}
+                onShare={() => void shareHeld(clip)}
+                onDiscard={() => void discard(clip)}
+                onRename={(title) => void rename(clip, title)}
+              />
+            ))}
           {items.map((clip, index) => (
             <ClipCard
               key={clip.clipId}
@@ -222,6 +276,8 @@ export default function App() {
               onOpen={() => setSelectedIndex(index)}
               onCopy={() => copyLink(clip)}
               onTogglePin={() => handleTogglePin(clip)}
+              onRename={(title) => void handleRename(clip, title)}
+              onDelete={() => void handleDelete(clip)}
             />
           ))}
         </div>
@@ -259,16 +315,65 @@ export default function App() {
   )
 }
 
+function HeldCard({
+  clip,
+  busy,
+  onShare,
+  onDiscard,
+  onRename,
+}: {
+  clip: HeldClip
+  busy: boolean
+  onShare: () => void
+  onDiscard: () => void
+  onRename: (title: string) => void
+}) {
+  return (
+    <article className="card held-card">
+      <div className="thumb">
+        {clip.thumb ? (
+          <img src={clip.thumb} alt="" />
+        ) : (
+          <span className="ph">On this PC</span>
+        )}
+        <span className="dur">{formatDuration(clip.durationMs)}</span>
+        <span className="badge-new">No link yet</span>
+      </div>
+      <div className="card-body">
+        <EditableTitle
+          value={clip.title}
+          placeholder="Untitled clip"
+          onSave={onRename}
+        />
+        <div className="card-sub">
+          <span>{clip.capturedAt ? formatDate(clip.capturedAt) : 'Just now'}</span>
+          <span>{(clip.bytes / 1_048_576).toFixed(1)} MB</span>
+        </div>
+        <div className="held-actions">
+          <button className="primary" disabled={busy} onClick={onShare}>
+            {busy ? 'Uploading...' : 'Generate link'}
+          </button>
+          <DeleteButton onDelete={onDiscard} />
+        </div>
+      </div>
+    </article>
+  )
+}
+
 function ClipCard({
   clip,
   onOpen,
   onCopy,
   onTogglePin,
+  onRename,
+  onDelete,
 }: {
   clip: Clip
   onOpen: () => void
   onCopy: () => void
   onTogglePin: () => void
+  onRename: (title: string) => void
+  onDelete: () => void
 }) {
   const thumb = thumbnailUrl(clip)
   return (
@@ -282,20 +387,31 @@ function ClipCard({
         <span className="dur">{formatDuration(clip.durationMs)}</span>
       </button>
       <div className="card-body">
-        <button className="card-title" onClick={onOpen}>
-          {clip.title || 'Untitled clip'}
-        </button>
+        <EditableTitle
+          value={clip.title}
+          placeholder="Untitled clip"
+          onSave={onRename}
+        />
         <div className="card-sub">
           <span>{formatDate(clip.capturedAt)}</span>
           <span>{clip.viewCount} views</span>
+        </div>
+        <div className="card-link">
+          <input
+            readOnly
+            value={`/c/${clip.publicSlug}`}
+            title={clip.shareUrl}
+            onClick={(event) => event.currentTarget.select()}
+          />
+          <button className="icon" onClick={onCopy} title="Copy link">
+            <CopyIcon />
+          </button>
+          <DeleteButton onDelete={onDelete} />
         </div>
       </div>
       <div className="card-actions">
         <button className="icon" onClick={onTogglePin} title={clip.favorite ? 'Unpin' : 'Pin'}>
           {clip.favorite ? '\u2605' : '\u2606'}
-        </button>
-        <button className="icon" onClick={onCopy} title="Copy link">
-          <CopyIcon />
         </button>
       </div>
     </article>
@@ -307,6 +423,43 @@ function CopyIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <rect x="9" y="9" width="11" height="11" rx="2" />
       <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+    </svg>
+  )
+}
+
+
+/**
+ * Two-step, because a stray click on a grid should not destroy a clip. The
+ * second click confirms, and moving the pointer away or waiting cancels it.
+ */
+function DeleteButton({ onDelete }: { onDelete: () => void }) {
+  const [armed, setArmed] = useState(false)
+
+  useEffect(() => {
+    if (!armed) return
+    const timer = setTimeout(() => setArmed(false), 3000)
+    return () => clearTimeout(timer)
+  }, [armed])
+
+  return (
+    <button
+      className={`icon${armed ? ' arming' : ''}`}
+      title={armed ? 'Click again to delete' : 'Delete clip'}
+      onMouseLeave={() => setArmed(false)}
+      onClick={() => {
+        if (armed) onDelete()
+        else setArmed(true)
+      }}
+    >
+      {armed ? 'Sure?' : <TrashIcon />}
+    </button>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />
     </svg>
   )
 }

@@ -37,6 +37,7 @@
   .check { display:flex; gap:9px; align-items:baseline; padding:4px 0; font-size:13px }
   .check b { font-weight:600 }
   code { background:var(--panel2); padding:1px 5px; border-radius:4px; font-size:12px }
+  .hint { color:var(--dim); font-size:12px; margin-top:6px }
   .foot { display:flex; align-items:center; gap:11px; margin-top:17px }
   .foot .status { margin-left:auto }
 </style>
@@ -64,13 +65,27 @@
 
   <section>
     <h2>3. What to record</h2>
-    <label for="display">Display</label>
+    <label for="display">Capture</label>
     <select id="display"><option>Checking…</option></select>
+    <div id="sourceHint" class="hint">Recording is per display. Picking a
+      program just selects the display it is on.</div>
     <label for="seconds">Clip length</label>
     <select id="seconds">
       <option value="15">15 seconds</option>
       <option value="30" selected>30 seconds</option>
       <option value="60">60 seconds</option>
+      <option value="90">90 seconds</option>
+      <option value="120">2 minutes</option>
+    </select>
+    <label for="hotkey">Hotkey</label>
+    <select id="hotkey">
+      <option value="0x75">F6</option>
+      <option value="0x76">F7</option>
+      <option value="0x77">F8</option>
+      <option value="0x78" selected>F9</option>
+      <option value="0x79">F10</option>
+      <option value="0x7A">F11</option>
+      <option value="0x7B">F12</option>
     </select>
   </section>
 
@@ -124,13 +139,51 @@
 
     const select = $('display');
     select.innerHTML = '';
+
+    // Programs first: nobody remembers which monitor is index 2, but everyone
+    // knows which one the game is on.
+    if (info.programs && info.programs.length) {
+      const group = document.createElement('optgroup');
+      group.label = 'Running programs';
+      for (const p of info.programs) {
+        const option = document.createElement('option');
+        option.value = p.display_index;
+        option.textContent = `${p.process} — display ${p.display_index + 1} (${p.width}×${p.height})`;
+        group.appendChild(option);
+      }
+      select.appendChild(group);
+    }
+
+    const displays = document.createElement('optgroup');
+    displays.label = 'Displays';
     for (const d of info.displays) {
       const option = document.createElement('option');
       option.value = d.index;
       option.textContent = `Display ${d.index + 1} — ${d.width}×${d.height}`;
-      select.appendChild(option);
+      displays.appendChild(option);
     }
-    if (info.displays.length > 1) select.value = info.displays[1].index;
+    select.appendChild(displays);
+
+    const now = info.current || {};
+    if (now.url) $('url').value = now.url;
+    if (now.key) $('key').value = now.key;
+    if (now.seconds) $('seconds').value = String(now.seconds);
+    if (now.hotkey) $('hotkey').value = now.hotkey;
+    if (now.display !== undefined && now.display !== null) {
+      select.value = String(now.display);
+    } else if (info.displays.length > 1) {
+      select.value = String(info.displays[1].index);
+    }
+
+    // Already configured: the connection was working, so do not make someone
+    // re-test it just to change which display they record.
+    if (now.url && now.key) {
+      connectionOk = true;
+      $('conn').className = 'status dim';
+      $('conn').textContent = 'Using your saved connection.';
+      $('save').textContent = 'Save';
+      $('skip').textContent = 'Cancel';
+    }
     refreshSave();
   }
 
@@ -163,6 +216,7 @@
         key: $('key').value,
         display: parseInt($('display').value, 10),
         seconds: parseInt($('seconds').value, 10),
+        hotkey: $('hotkey').value,
       });
     } catch (err) {
       result = { ok: false, message: String(err) };

@@ -19,6 +19,7 @@ from pathlib import Path
 
 from paths import data_dir
 
+from . import sound
 from .cutter import ClipError, flush
 from .config import get_capture_settings
 from .ffmpeg import FFMPEG
@@ -81,6 +82,21 @@ class Daemon:
         self.gpu = gpu_name()
         self._busy = threading.Lock()
 
+    def program_name(self) -> str | None:
+        """What was on the captured display, for naming the clip.
+
+        A library of timestamps tells you nothing. Naming the clip after the
+        game is the difference between scanning thumbnails and reading a list.
+        """
+        try:
+            from .windows import program_on_display
+
+            return program_on_display(self.s.ddagrab_output_idx)
+        except Exception:  # noqa: BLE001
+            # Never worth failing a clip over: an unnamed clip is fine, a lost
+            # one is not.
+            return None
+
     def capture_meta(self, width: int, height: int) -> dict:
         return {
             "encoder": "h264_nvenc",
@@ -96,11 +112,15 @@ class Daemon:
             "output_idx": self.s.ddagrab_output_idx,
         }
 
-    def make_clip(self) -> str | None:
-        """Flush the buffer and upload. Returns the share URL."""
+    def make_clip(self) -> dict:
+        """Flush the buffer into a clip.
+
+        Returns what happened: uploaded with a link, held locally awaiting one,
+        or failed.
+        """
         if not self._busy.acquire(blocking=False):
             print("  ... already making a clip, ignoring")
-            return None
+            return {"status": "busy", "path": None, "url": None}
         try:
             captured_at = datetime.now(timezone.utc)
             started = time.perf_counter()
@@ -115,21 +135,37 @@ class Daemon:
                 f"in {remuxed - started:.2f}s"
             )
 
-            url = self.uploader.submit(
-                result, captured_at, self.capture_meta(result.width, result.height)
-            )
+            sound.clip_saved()
+            meta = self.capture_meta(result.width, result.height)
+            title = self.program_name()
+            if title:
+                meta["program"] = title
+
+            if not self.s.auto_upload:
+                path = self.uploader.hold(result, captured_at, meta, title=title)
+                print(f"  kept locally in {time.perf_counter() - started:.2f}s")
+                print("  waiting for you to generate a link")
+                return {"status": "held", "path": path, "url": None}
+
+            url = self.uploader.submit(result, captured_at, meta, title=title)
             print(f"  uploaded in {time.perf_counter() - remuxed:.2f}s")
             print(f"  -> {url}   (time to link: {time.perf_counter() - started:.2f}s)")
             if copy_to_clipboard(url):
                 print("  copied to clipboard")
-            return url
+            return {"status": "uploaded", "path": None, "url": url}
         except ClipError as exc:
+            sound.clip_failed()
             print(f"  clip failed: {exc}")
+            return {"status": "failed", "path": None, "url": None, "error": str(exc)}
         except (UploadError, OSError) as exc:
+            # The clip itself is safe on disk, so this is a softer failure than
+            # not capturing at all. Still worth hearing.
+            sound.clip_failed()
             print(f"  upload failed, kept in the journal for retry: {exc}")
+            return {"status": "failed", "path": None, "url": None, "error": str(exc)}
         finally:
             self._busy.release()
-        return None
+        return {"status": "failed", "path": None, "url": None}
 
     def start_buffer(self) -> None:
         print(f"Starting ring buffer: {self.s.buffer_seconds}s window, "
