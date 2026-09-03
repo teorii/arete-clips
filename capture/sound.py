@@ -71,9 +71,19 @@ def _play(path: Path | None) -> None:
         warn("sound", exc, "no audible confirmation when a clip is taken")
 
 
+def _wanted() -> bool:
+    # Read at use rather than cached, so turning it off in settings takes
+    # effect on the next clip instead of the next launch.
+    from preferences import load
+
+    return load().play_sound
+
+
 def clip_saved() -> None:
-    _play(_ensure("saved.wav", _SAVED))
+    if _wanted():
+        _play(_ensure("saved.wav", _SAVED))
 
 
 def clip_failed() -> None:
-    _play(_ensure("failed.wav", _FAILED))
+    if _wanted():
+        _play(_ensure("failed.wav", _FAILED))

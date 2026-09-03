@@ -435,10 +435,19 @@ def preflight() -> bool:
     from sqlalchemy import text as sql_text
 
     from server.config import get_settings
-    from server.db import engine
 
     settings = get_settings()
     ok = True
+
+    # Checked before importing the engine, which raises on anything else, so
+    # this reports the setting rather than a traceback.
+    if not settings.database_url.startswith("sqlite"):
+        scheme = settings.database_url.split("://", 1)[0]
+        print(f"DATABASE_URL is set to {scheme!r}, but this build only supports SQLite.")
+        print("  Remove it from the config to take the default.")
+        return False
+
+    from server.db import engine
 
     try:
         with engine.connect() as conn:
@@ -640,6 +649,7 @@ def main() -> int:
         # Resolved on each call: the capture service is replaced when settings
         # change, and its uploader with it.
         uploader_factory=lambda: services["capture"].daemon.uploader,
+        open_settings=lambda: open_settings(),
     )
 
     if configured:
@@ -710,6 +720,14 @@ def main() -> int:
             an explicit choice from the tray menu.
             """
             if quitting.is_set():
+                return True
+            from preferences import load
+
+            if load().quit_on_close:
+                # Asked for: the X means quit. Stop the recorder here rather
+                # than leaving teardown to a window that is already closing.
+                quitting.set()
+                services["capture"].stop()
                 return True
             window.hide()
             if not hinted.is_set():

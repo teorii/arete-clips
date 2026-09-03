@@ -1,0 +1,8 @@
+{
+  "play_sound": true,
+  "show_notifications": true,
+  "quit_on_close": false,
+  "copy_link_automatically": true,
+  "confirm_delete": true,
+  "held_warning_gb": 2
+}

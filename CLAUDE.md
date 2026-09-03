@@ -57,6 +57,18 @@ An install hosts its own clips by default. Pointing `API_BASE_URL` at another
 Arete makes it a client of that one instead, and `desktop.py` derives the mode
 from that rather than from a flag.
 
+## Two kinds of settings
+
+`config.env` is what the app needs to run: where clips go, which display, which
+key. Setup writes it, and `SETUP_COMPLETE=1` is what marks a machine as
+configured, not the presence of a key: a hosting install has no key at that
+point because the app creates its own account on first start.
+
+`preferences.json` is how it should behave, and everything in it replaced a
+hardcoded decision. Read at use, not cached, so a change applies immediately.
+Unknown keys ignored, missing keys defaulted, corrupt file preserved as
+`.corrupt` and reported.
+
 ## Failing loudly
 
 `problems.warn(where, exception, consequence)` is how anything survivable gets

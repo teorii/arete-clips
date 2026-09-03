@@ -116,6 +116,26 @@ Run `Arete.exe`. It asks three things and then records:
 There is no key to obtain. A hosting install creates its own account on first
 start, and prints an address and invite code so another machine can join it.
 
+## Settings
+
+Reachable from the tray. The first three sections change what the app needs to
+run and are written to `config.env`. The fourth is preferences: how the app
+should behave, kept in `preferences.json` beside it.
+
+| Preference | Default | What it changes |
+|---|---|---|
+| Play a sound when a clip is taken | on | The only confirmation you get with a game in front |
+| Show tray notifications | on | Balloons, which a fullscreen game covers anyway |
+| Fully close when pressing X | off | On quits instead of minimizing to the tray and continuing to record |
+| Copy a link as soon as it is made | on | Off leaves the link on screen to copy yourself |
+| Ask twice before deleting a clip | on | Off makes the trash immediate |
+| Warn when unshared clips pass | 2 GB | When the held-storage bar turns red |
+
+Both files live in `%APPDATA%\Arete`. Preferences are read when used rather
+than cached, so a change applies to the next clip rather than the next launch.
+Unknown keys are ignored and missing ones take their default, so a file written
+by a different version still loads.
+
 ## Sharing
 
 The app opens a tunnel so links work off this machine, and closes it on quit.

@@ -96,6 +96,10 @@ class Tray:
     def notify(self, message: str, title: str = APP_NAME) -> None:
         """Balloon notification. Best effort: some Windows configurations
         suppress these entirely, and a missing toast is not worth an error."""
+        from preferences import load
+
+        if not load().show_notifications:
+            return
         try:
             self.icon.notify(message, title)
         except Exception as exc:  # noqa: BLE001

@@ -10,10 +10,11 @@ import {
   thumbnailUrl,
   trimClip,
 } from './api'
-import { type HeldClip } from './bridge'
+import { type HeldClip, getBridge, isDesktop } from './bridge'
 import { ClipDetail } from './ClipDetail'
 import { EditableTitle } from './EditableTitle'
 import { useHeldClips } from './useHeldClips'
+import { usePreferences } from './usePreferences'
 import { type RecentLink, clearRecent, loadRecent, pushRecent } from './recentLinks'
 import { type Filter, useClips } from './useClips'
 
@@ -31,6 +32,15 @@ export default function App() {
     filter,
   )
   const { held, heldBytes, busy, generate, discard, discardAll, rename } = useHeldClips()
+  const preferences = usePreferences()
+
+  // Settings live in the desktop shell, so the button only exists there. The
+  // tray menu is the other way in, and Windows hides new tray icons behind the
+  // overflow chevron, which makes it a poor only way in.
+  const [desktop, setDesktop] = useState(false)
+  useEffect(() => {
+    void isDesktop().then(setDesktop)
+  }, [])
 
   // Held clips are hidden by a search or the pinned filter: neither can apply
   // to something the server has never seen.
@@ -44,7 +54,9 @@ export default function App() {
         setToast(result.message ?? 'Could not generate a link')
         return
       }
-      const copied = await copyText(result.url)
+      const copied = preferences.copy_link_automatically
+        ? await copyText(result.url)
+        : false
       setRecent(
         pushRecent({
           slug: result.url.split('/').pop() ?? result.url,
@@ -55,7 +67,7 @@ export default function App() {
       setToast(copied ? 'Link copied' : `Link ready: ${result.url}`)
       refresh()
     },
-    [generate, refresh],
+    [generate, refresh, preferences.copy_link_automatically],
   )
 
   // Debounce so typing does not fire a request per keystroke.
@@ -187,6 +199,15 @@ export default function App() {
         <button className="ghost" onClick={refresh} title="Reload">
           &#8635;
         </button>
+        {desktop && (
+          <button
+            className="ghost"
+            onClick={() => void getBridge().then((bridge) => bridge?.open_settings())}
+            title="Settings"
+          >
+            Settings
+          </button>
+        )}
       </header>
 
       {showRecent && (
@@ -229,7 +250,11 @@ export default function App() {
       )}
 
       {showHeld && (
-        <div className={`held-bar${heldBytes > 2_000_000_000 ? ' heavy' : ''}`}>
+        <div
+          className={`held-bar${
+            heldBytes > preferences.held_warning_gb * 1_073_741_824 ? ' heavy' : ''
+          }`}
+        >
           <strong>{held.length}</strong>
           <span>
             clip{held.length === 1 ? '' : 's'} on this PC, not shared yet
@@ -267,6 +292,7 @@ export default function App() {
                 onShare={() => void shareHeld(clip)}
                 onDiscard={() => void discard(clip)}
                 onRename={(title) => void rename(clip, title)}
+                confirmDelete={preferences.confirm_delete}
               />
             ))}
           {items.map((clip, index) => (
@@ -278,6 +304,7 @@ export default function App() {
               onTogglePin={() => handleTogglePin(clip)}
               onRename={(title) => void handleRename(clip, title)}
               onDelete={() => void handleDelete(clip)}
+              confirmDelete={preferences.confirm_delete}
             />
           ))}
         </div>
@@ -321,12 +348,14 @@ function HeldCard({
   onShare,
   onDiscard,
   onRename,
+  confirmDelete,
 }: {
   clip: HeldClip
   busy: boolean
   onShare: () => void
   onDiscard: () => void
   onRename: (title: string) => void
+  confirmDelete: boolean
 }) {
   return (
     <article className="card held-card">
@@ -353,7 +382,7 @@ function HeldCard({
           <button className="primary" disabled={busy} onClick={onShare}>
             {busy ? 'Uploading...' : 'Generate link'}
           </button>
-          <DeleteButton onDelete={onDiscard} />
+          <DeleteButton onDelete={onDiscard} confirm={confirmDelete} />
         </div>
       </div>
     </article>
@@ -367,6 +396,7 @@ function ClipCard({
   onTogglePin,
   onRename,
   onDelete,
+  confirmDelete,
 }: {
   clip: Clip
   onOpen: () => void
@@ -374,6 +404,7 @@ function ClipCard({
   onTogglePin: () => void
   onRename: (title: string) => void
   onDelete: () => void
+  confirmDelete: boolean
 }) {
   const thumb = thumbnailUrl(clip)
   return (
@@ -406,7 +437,7 @@ function ClipCard({
           <button className="icon" onClick={onCopy} title="Copy link">
             <CopyIcon />
           </button>
-          <DeleteButton onDelete={onDelete} />
+          <DeleteButton onDelete={onDelete} confirm={confirmDelete} />
         </div>
       </div>
       <div className="card-actions">
@@ -432,7 +463,13 @@ function CopyIcon() {
  * Two-step, because a stray click on a grid should not destroy a clip. The
  * second click confirms, and moving the pointer away or waiting cancels it.
  */
-function DeleteButton({ onDelete }: { onDelete: () => void }) {
+function DeleteButton({
+  onDelete,
+  confirm,
+}: {
+  onDelete: () => void
+  confirm: boolean
+}) {
   const [armed, setArmed] = useState(false)
 
   useEffect(() => {
@@ -445,9 +482,11 @@ function DeleteButton({ onDelete }: { onDelete: () => void }) {
     <button
       className={`icon${armed ? ' arming' : ''}`}
       title={armed ? 'Click again to delete' : 'Delete clip'}
+      // Only meaningful while a second click is expected.
+      aria-live={confirm ? 'polite' : undefined}
       onMouseLeave={() => setArmed(false)}
       onClick={() => {
-        if (armed) onDelete()
+        if (armed || !confirm) onDelete()
         else setArmed(true)
       }}
     >

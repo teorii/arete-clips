@@ -96,13 +96,45 @@ class AppBridge:
     to reach the client, not the API.
     """
 
-    def __init__(self, uploader_factory=None):
+    def __init__(self, uploader_factory=None, open_settings=None):
         self._uploader_factory = uploader_factory
+        self._open_settings = open_settings
+
+    def open_settings(self) -> dict:
+        """Show the settings screen.
+
+        Reachable from the window as well as the tray: Windows files new tray
+        icons under the overflow chevron, so a menu there is not somewhere
+        anyone finds a setting.
+        """
+        if self._open_settings is None:
+            return {"ok": False, "message": "settings are not available here"}
+        self._open_settings()
+        return {"ok": True}
 
     def _uploader(self):
         if self._uploader_factory is None:
             raise RuntimeError("no uploader is available yet")
         return self._uploader_factory()
+
+    def preferences(self) -> dict:
+        """Current preferences, for the settings screen and the library."""
+        from dataclasses import asdict
+
+        from preferences import load
+
+        return asdict(load())
+
+    def save_preferences(self, values: dict) -> dict:
+        from dataclasses import asdict
+
+        from preferences import update
+
+        try:
+            return {"ok": True, "preferences": asdict(update(values or {}))}
+        except Exception as exc:  # noqa: BLE001
+            warn("preferences", exc, "the change was not saved")
+            return {"ok": False, "message": str(exc)}
 
     def held_clips(self) -> list[dict]:
         """Clips captured on this machine that have no link yet."""
@@ -158,8 +190,9 @@ class SetupApi(AppBridge):
         on_saved: Callable[[], None],
         on_skipped: Callable[[], None],
         uploader_factory=None,
+        open_settings=None,
     ):
-        super().__init__(uploader_factory)
+        super().__init__(uploader_factory, open_settings)
         self._on_saved = on_saved
         self._on_skipped = on_skipped
         self.saved = False

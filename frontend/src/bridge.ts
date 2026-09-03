@@ -20,12 +20,28 @@ export interface HeldClip {
   thumb: string | null
 }
 
+export interface Preferences {
+  copy_link_automatically: boolean
+  confirm_delete: boolean
+  held_warning_gb: number
+}
+
+/** What the app falls back to outside the desktop shell, where there is no
+ * bridge to ask. Matches the defaults in preferences.py. */
+export const DEFAULT_PREFERENCES: Preferences = {
+  copy_link_automatically: true,
+  confirm_delete: true,
+  held_warning_gb: 2,
+}
+
 export interface Bridge {
   held_clips(): Promise<HeldClip[]>
   generate_link(path: string): Promise<{ ok: boolean; url?: string; message?: string }>
   discard_clip(path: string): Promise<{ ok: boolean; message?: string }>
   discard_all_clips(): Promise<{ ok: boolean; removed?: number; message?: string }>
   rename_clip(path: string, title: string): Promise<{ ok: boolean; message?: string }>
+  preferences(): Promise<Partial<Preferences>>
+  open_settings(): Promise<{ ok: boolean; message?: string }>
 }
 
 function current(): Bridge | null {
@@ -45,4 +61,9 @@ export async function getBridge(timeoutMs = 4000): Promise<Bridge | null> {
     await new Promise((resolve) => setTimeout(resolve, 80))
   }
   return null
+}
+
+/** Whether this is running inside the desktop app rather than a browser tab. */
+export async function isDesktop(): Promise<boolean> {
+  return (await getBridge()) !== null
 }

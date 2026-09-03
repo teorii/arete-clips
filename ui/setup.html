@@ -38,6 +38,12 @@
   .check b { font-weight:600 }
   code { background:var(--panel2); padding:1px 5px; border-radius:4px; font-size:12px }
   .hint { color:var(--dim); font-size:12px; margin-top:6px }
+  .check-row {
+    display:flex; gap:9px; align-items:flex-start; margin:9px 0;
+    font-size:13px; color:var(--text); cursor:pointer;
+  }
+  .check-row input { width:auto; margin-top:2px; flex:none }
+  .check-row em { display:block; color:var(--dim); font-size:12px; font-style:normal }
   .foot { display:flex; align-items:center; gap:11px; margin-top:17px }
   .foot .status { margin-left:auto }
 </style>
@@ -103,6 +109,30 @@
     </select>
   </section>
 
+  <section>
+    <h2>4. Behaviour</h2>
+    <label class="check-row"><input type="checkbox" id="play_sound">
+      <span>Play a sound when a clip is taken
+        <em>the only confirmation you get with a game in front</em></span></label>
+    <label class="check-row"><input type="checkbox" id="show_notifications">
+      <span>Show tray notifications</span></label>
+    <label class="check-row"><input type="checkbox" id="quit_on_close">
+      <span>Fully close when pressing X
+        <em>off minimizes to the tray and keeps recording</em></span></label>
+    <label class="check-row"><input type="checkbox" id="copy_link_automatically">
+      <span>Copy a link to the clipboard as soon as it is made</span></label>
+    <label class="check-row"><input type="checkbox" id="confirm_delete">
+      <span>Ask twice before deleting a clip</span></label>
+    <label for="held_warning_gb">Warn when unshared clips pass</label>
+    <select id="held_warning_gb">
+      <option value="0.5">500 MB</option>
+      <option value="1">1 GB</option>
+      <option value="2" selected>2 GB</option>
+      <option value="5">5 GB</option>
+      <option value="10">10 GB</option>
+    </select>
+  </section>
+
   <div class="foot">
     <button id="save" class="primary" disabled>Save and start</button>
     <button id="skip">Skip for now</button>
@@ -133,6 +163,32 @@
     while (!window.pywebview || !window.pywebview.api) {
       await new Promise(r => setTimeout(r, 60));
     }
+  }
+
+  const TOGGLES = ['play_sound', 'show_notifications', 'quit_on_close',
+                   'copy_link_automatically', 'confirm_delete'];
+
+  async function loadPreferences() {
+    let current;
+    try {
+      current = await window.pywebview.api.preferences();
+    } catch (err) {
+      // Defaults are already in the markup, so a failure here leaves the
+      // section usable rather than blank.
+      console.warn('preferences unavailable', err);
+      return;
+    }
+    for (const name of TOGGLES) $(name).checked = Boolean(current[name]);
+    if (current.held_warning_gb) {
+      $('held_warning_gb').value = String(current.held_warning_gb);
+    }
+  }
+
+  async function savePreferences() {
+    const values = {};
+    for (const name of TOGGLES) values[name] = $(name).checked;
+    values.held_warning_gb = parseFloat($('held_warning_gb').value);
+    await window.pywebview.api.save_preferences(values);
   }
 
   async function probe() {
@@ -253,6 +309,9 @@
     $('saveStatus').textContent = 'Saving…';
     let result;
     try {
+      // Preferences live in their own file, so they are written separately and
+      // first: they apply even if the config save is refused.
+      await savePreferences();
       result = await window.pywebview.api.save({
         mode: $('mode').value,
         url: $('url').value,
@@ -275,7 +334,7 @@
 
   // Hosting is the default, so the join fields start hidden.
   $('mode').onchange();
-  ready().then(probe);
+  ready().then(() => Promise.all([probe(), loadPreferences()]));
 </script>
 </body>
 </html>
