@@ -118,17 +118,18 @@ Capture itself is not covered: it needs a GPU and a live display.
 
 ## Actual gaps, in order
 
-1. **No audio.** `ddagrab` is video-only. A clip with no callouts or ability
-   sounds is half a clip, and it is the first thing anyone notices.
-2. **No trim.** Saving the last 30s and keeping all 30s is the whole feature
-   working at its crudest. In and out points, snapped to keyframes so the cut
-   stays a byte copy.
-3. **Capture failure is silent.** The tray light is set once at startup and
-   never updated, so if ffmpeg dies mid-session the app looks fine and F9 just
-   stops working. Watch the process and say so.
-4. **Links only resolve on this machine.** Only matters if someone else is ever
-   going to open one. `STORAGE_BACKEND=r2` plus a real host is the fix, and it
-   is configuration, not code.
+1. **No audio.** `ddagrab` is video-only and Windows ships no loopback device.
+   The code to use one is written and dormant: install a device providing
+   `virtual-audio-capturer` and it is picked up automatically. Deferred on
+   purpose, not forgotten.
+2. **Links only resolve on this machine.** `BIND_HOST=0.0.0.0` plus a LAN
+   address in `PUBLIC_BASE_URL` covers the same network. Anything wider needs
+   `STORAGE_BACKEND=r2` and a host. Note there is no auth, so binding wide
+   exposes viewing and deleting to whoever can reach the port.
+
+Done and worth not re-litigating: trimming (server-side remux, keyframe
+snapped), capture-failure detection (a wedged encoder counts, not just a dead
+one), and staging cleanup (clips used to be stored twice).
 
 Not gaps, deliberately: auth, packaging, and everything in the do-not-build
 list above.

@@ -3,8 +3,10 @@ import { useEffect, useRef, useState } from 'react'
 import {
   type Clip,
   formatBytes,
+  formatClock,
   formatDate,
   formatDuration,
+  keyframeGridMs,
   sourceBytes,
   sourceUrl,
   thumbnailUrl,
@@ -21,6 +23,7 @@ interface Props {
   onTogglePin: () => void
   onCopy: () => void
   onDelete: () => void
+  onTrim: (startMs: number, endMs: number) => void
 }
 
 export function ClipDetail({
@@ -34,19 +37,23 @@ export function ClipDetail({
   onTogglePin,
   onCopy,
   onDelete,
+  onTrim,
 }: Props) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(clip.title ?? '')
   const [confirming, setConfirming] = useState(false)
+  const [trimming, setTrimming] = useState(false)
+  const [range, setRange] = useState<[number, number]>([0, clip.durationMs])
   const inputRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+
+  const grid = keyframeGridMs(clip)
+  // The cut seeks to the nearest earlier keyframe, so show where it will
+  // actually land rather than where the handle was dropped.
+  const effectiveStart = Math.floor(range[0] / grid) * grid
+  const selected = Math.max(0, range[1] - effectiveStart)
 
   // Reset per-clip UI state when arrow keys move to a different clip.
-  useEffect(() => {
-    setEditing(false)
-    setConfirming(false)
-    setDraft(clip.title ?? '')
-  }, [clip.clipId, clip.title])
-
   useEffect(() => {
     if (editing) inputRef.current?.select()
   }, [editing])
@@ -59,7 +66,10 @@ export function ClipDetail({
         return
       }
       if (event.key === 'Escape') {
-        onClose()
+        // Back out of trimming first, so Escape does not close the whole sheet
+        // and silently discard a selection.
+        if (trimming) setTrimming(false)
+        else onClose()
         return
       }
       // keydown still bubbles to window when the player has focus, so without
@@ -73,7 +83,37 @@ export function ClipDetail({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [editing, hasPrev, hasNext, onClose, onPrev, onNext])
+  }, [editing, trimming, hasPrev, hasNext, onClose, onPrev, onNext])
+
+  function startTrimming() {
+    // Seed the range here rather than in an effect: the duration changes after
+    // a trim, and reading it at the moment the panel opens is always current.
+    setRange([0, clip.durationMs])
+    setTrimming(true)
+  }
+
+  function startRenaming() {
+    setDraft(clip.title ?? '')
+    setEditing(true)
+  }
+
+  function markPoint(edge: 'start' | 'end') {
+    const element = videoRef.current
+    if (!element) return
+    const at = element.currentTime * 1000
+    setRange(([start, end]) =>
+      edge === 'start'
+        ? [Math.min(at, end - grid), end]
+        : [start, Math.max(at, start + grid)],
+    )
+  }
+
+  function previewRange() {
+    const element = videoRef.current
+    if (!element) return
+    element.currentTime = effectiveStart / 1000
+    void element.play()
+  }
 
   function commitRename() {
     setEditing(false)
@@ -103,7 +143,7 @@ export function ClipDetail({
               }}
             />
           ) : (
-            <h2 onClick={() => setEditing(true)} title="Click to rename">
+            <h2 onClick={startRenaming} title="Click to rename">
               {clip.title || 'Untitled clip'}
             </h2>
           )}
@@ -118,12 +158,24 @@ export function ClipDetail({
         <div className="stage">
           {video ? (
             <video
-              key={clip.clipId}
+              // Keyed on the URL, not the id: the URL carries a version that
+              // changes when the clip is edited, and remounting is what makes
+              // the player pick up the new file instead of the one it already
+              // has loaded.
+              key={video}
+              ref={videoRef}
               src={video}
               poster={thumbnailUrl(clip) ?? undefined}
               controls
               autoPlay
               playsInline
+              onTimeUpdate={() => {
+                // While trimming, stop at the out point so playback previews
+                // the cut instead of running past it.
+                const element = videoRef.current
+                if (!trimming || !element) return
+                if (element.currentTime * 1000 >= range[1]) element.pause()
+              }}
             />
           ) : (
             <div className="pending">No playable rendition ({clip.status})</div>
@@ -146,6 +198,53 @@ export function ClipDetail({
           <span className="chip">{formatDate(clip.capturedAt)}</span>
         </div>
 
+        {trimming && (
+          <div className="trim">
+            <div className="trim-bar">
+              <div
+                className="trim-sel"
+                style={{
+                  left: `${(effectiveStart / clip.durationMs) * 100}%`,
+                  width: `${(selected / clip.durationMs) * 100}%`,
+                }}
+              />
+            </div>
+            <div className="trim-controls">
+              <button className="ghost" onClick={() => markPoint('start')}>
+                Set start
+              </button>
+              <span className="trim-readout">
+                {formatClock(effectiveStart)} to {formatClock(range[1])}
+                <b> {formatClock(selected)}</b>
+              </span>
+              <button className="ghost" onClick={() => markPoint('end')}>
+                Set end
+              </button>
+              <button className="ghost" onClick={previewRange}>
+                Preview
+              </button>
+              <button
+                className="primary"
+                disabled={selected < 500}
+                onClick={() => {
+                  setTrimming(false)
+                  onTrim(effectiveStart, range[1])
+                }}
+              >
+                Trim
+              </button>
+              <button className="ghost" onClick={() => setTrimming(false)}>
+                Cancel
+              </button>
+            </div>
+            <p className="muted">
+              Scrub the player, then set the points. Cuts land on keyframes every{' '}
+              {grid / 1000}s, so the start snaps back to the nearest one. This
+              replaces the clip and cannot be undone.
+            </p>
+          </div>
+        )}
+
         <div className="sheet-actions">
           <input className="link" value={clip.shareUrl} readOnly onFocus={(e) => e.target.select()} />
           <button className="primary" onClick={onCopy}>
@@ -154,6 +253,11 @@ export function ClipDetail({
           <a className="ghost" href={clip.shareUrl} target="_blank" rel="noreferrer">
             Open
           </a>
+          {video && !trimming && (
+            <button className="ghost" onClick={startTrimming}>
+              Trim
+            </button>
+          )}
           {confirming ? (
             <>
               <button className="danger" onClick={onDelete}>

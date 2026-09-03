@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import os
 import socket
 import sys
 import threading
@@ -43,10 +44,18 @@ from capture.daemon import Daemon  # noqa: E402
 from capture.hotkey import pump  # noqa: E402
 from tray import Tray  # noqa: E402
 
-HOST = "127.0.0.1"
-PORT = 8000
+# Loopback by default. Setting BIND_HOST=0.0.0.0 makes share links work for
+# anyone on the same network, which is the difference between a link that plays
+# on your machine and one you can actually send someone. There is no auth, so
+# only do that on a network you trust: every clip becomes readable, and
+# deletable, by anyone who can reach the port.
+HOST = os.environ.get("BIND_HOST", "127.0.0.1")
+PORT = int(os.environ.get("PORT", "8000"))
+# Where the window points. Distinct from HOST, because 0.0.0.0 is a bind
+# address and not somewhere anything can navigate to.
+UI_HOST = "127.0.0.1" if HOST in {"0.0.0.0", "::"} else HOST
 DIST = ROOT / "frontend" / "dist"
-APP_URL = f"http://{HOST}:{PORT}/app/"
+APP_URL = f"http://{UI_HOST}:{PORT}/app/"
 ICON_PATH = ROOT / "assets" / "arete.ico"
 
 
@@ -129,7 +138,7 @@ def wait_for_health(timeout: float = 25.0) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            if httpx.get(f"http://{HOST}:{PORT}/healthz", timeout=1.0).status_code == 200:
+            if httpx.get(f"http://{UI_HOST}:{PORT}/healthz", timeout=1.0).status_code == 200:
                 return True
         except httpx.HTTPError:
             pass
@@ -306,7 +315,7 @@ def main() -> int:
         print("frontend/dist is missing. Build it first:  cd frontend && npm run build")
         return 1
 
-    if port_is_taken(HOST, PORT):
+    if port_is_taken(UI_HOST, PORT):
         print(
             f"Port {PORT} is already in use. Another {APP_NAME} or a uvicorn "
             "started from a terminal is probably still running."

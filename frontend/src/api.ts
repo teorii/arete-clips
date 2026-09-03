@@ -152,3 +152,29 @@ export async function copyText(text: string): Promise<boolean> {
     }
   }
 }
+
+/**
+ * Shorten a clip in place.
+ *
+ * Destructive: the trimmed-away seconds stop existing. Cuts land on the nearest
+ * earlier keyframe, so the result can be slightly wider than requested.
+ */
+export function trimClip(clipId: string, startMs: number, endMs: number): Promise<Clip> {
+  return request<Clip>(`/api/clips/${clipId}/trim`, {
+    method: 'POST',
+    body: JSON.stringify({ startMs: Math.round(startMs), endMs: Math.round(endMs) }),
+  })
+}
+
+/** Keyframe spacing in ms, which is how coarse a cut can be. */
+export function keyframeGridMs(clip: Clip): number {
+  const seconds = Number(clip.captureMeta?.segment_seconds ?? 2)
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 2000
+}
+
+export function formatClock(ms: number): string {
+  const total = Math.max(0, ms) / 1000
+  const minutes = Math.floor(total / 60)
+  const seconds = (total % 60).toFixed(1).padStart(4, '0')
+  return `${minutes}:${seconds}`
+}

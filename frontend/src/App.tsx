@@ -8,6 +8,7 @@ import {
   formatDuration,
   patchClip,
   thumbnailUrl,
+  trimClip,
 } from './api'
 import { ClipDetail } from './ClipDetail'
 import { type RecentLink, clearRecent, loadRecent, pushRecent } from './recentLinks'
@@ -83,6 +84,20 @@ export default function App() {
       }
     },
     [filter, replace, remove],
+  )
+
+  const handleTrim = useCallback(
+    async (clip: Clip, startMs: number, endMs: number) => {
+      setToast('Trimming...')
+      try {
+        const updated = await trimClip(clip.clipId, startMs, endMs)
+        replace(updated)
+        setToast(`Trimmed to ${(updated.durationMs / 1000).toFixed(1)}s`)
+      } catch (err) {
+        setToast(err instanceof Error ? `Trim failed: ${err.message}` : 'Trim failed')
+      }
+    },
+    [replace],
   )
 
   const handleDelete = useCallback(
@@ -222,6 +237,7 @@ export default function App() {
 
       {selected && (
         <ClipDetail
+          key={selected.clipId}
           clip={selected}
           hasPrev={selectedIndex !== null && selectedIndex > 0}
           hasNext={selectedIndex !== null && selectedIndex < items.length - 1}
@@ -234,6 +250,7 @@ export default function App() {
           onTogglePin={() => handleTogglePin(selected)}
           onCopy={() => copyLink(selected)}
           onDelete={() => handleDelete(selected)}
+          onTrim={(startMs, endMs) => handleTrim(selected, startMs, endMs)}
         />
       )}
 

@@ -166,6 +166,27 @@ which is the faster way back to something you pasted into Discord an hour ago.
 `http://localhost:8000` still serves the plain server-rendered library, which
 needs no build step.
 
+## Trimming
+
+Open a clip, hit **Trim**, scrub to each point and set it. The cut is a remux:
+`-ss`/`-to` with `-c copy`, so it is near-instant and lossless, and the file
+genuinely shrinks rather than being played back with bounds.
+
+The cost is granularity. Cuts land on keyframes, which capture places at
+segment boundaries, so the start snaps back to the nearest one and the UI shows
+where it will actually land rather than where you dropped the handle. Frame
+accuracy would mean re-encoding the partial group of pictures at each edge.
+
+Trimming replaces the clip. That is the point: the 25 seconds of walking back
+to lane stop existing.
+
+## Sharing beyond this machine
+
+Links resolve to `localhost` by default, which means they only work here. For
+the same network, set `BIND_HOST=0.0.0.0` and point `PUBLIC_BASE_URL` at your
+LAN address. There is no auth, so anyone who can reach the port can view and
+delete clips: only do that on a network you trust.
+
 ## Going from prototype to real
 
 Both swaps are configuration, not code.

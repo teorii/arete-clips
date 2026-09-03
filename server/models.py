@@ -108,6 +108,12 @@ class Clip(Base):
         Boolean, default=False, nullable=False, server_default=false()
     )
 
+    # Bumped whenever the bytes behind a rendition change, and appended to
+    # playback URLs. Without it an edit leaves every cached copy stale: the
+    # browser, the share page and any embed keep serving the old file from a
+    # URL that never changed.
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False, server_default="1")
+
     view_count: Mapped[int] = mapped_column(BigInteger, default=0)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

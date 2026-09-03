@@ -161,3 +161,26 @@ a { color: var(--accent); }
   .overlay { padding: 0; }
   .sheet { border-radius: 0; height: 100%; }
 }
+
+/* -------------------------------------------------------------------- trim */
+
+.trim { margin: 14px 0 4px; }
+
+.trim-bar {
+  position: relative; height: 10px; border-radius: 5px;
+  background: var(--panel-2); border: 1px solid var(--line); overflow: hidden;
+}
+.trim-sel {
+  position: absolute; top: 0; bottom: 0; background: var(--accent);
+  min-width: 2px;
+}
+
+.trim-controls {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px;
+}
+.trim-readout {
+  font-family: ui-monospace, 'Cascadia Code', monospace; font-size: 12px;
+  color: var(--dim);
+}
+.trim-readout b { color: var(--text); margin-left: 6px; }
+.trim .muted { margin: 8px 0 0; font-size: 12px; }

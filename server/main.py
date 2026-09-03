@@ -34,6 +34,7 @@ from .models import (
     TriggerType,
     Visibility,
 )
+from .media import MediaError, duration_seconds, poster, trim
 from .schemas import (
     ClipComplete,
     ClipCreate,
@@ -41,6 +42,7 @@ from .schemas import (
     ClipOut,
     ClipPage,
     ClipPatch,
+    ClipTrim,
     RenditionOut,
     UploadTargetOut,
 )
@@ -99,6 +101,11 @@ def _ensure_columns() -> None:
                     f"boolean not null default {default}"
                 )
             )
+    if "version" not in existing:
+        with engine.begin() as conn:
+            conn.execute(
+                text("alter table clips add column version integer not null default 1")
+            )
 
 
 def _storage_key(clip_id: UUID, captured: datetime, label: str) -> str:
@@ -124,6 +131,18 @@ def _as_utc(value: datetime | None) -> datetime | None:
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
 
+def _rendition_url(clip: Clip, rendition: ClipRendition) -> str | None:
+    """Playback URL, versioned.
+
+    Trimming rewrites a rendition in place, so the bytes change while the key
+    stays the same. Without a version in the URL every cache in the chain keeps
+    serving the old file and an edit looks like it silently failed.
+    """
+    if not rendition.storage_key:
+        return None
+    return f"{get_storage().playback_url(rendition.storage_key)}?v={clip.version}"
+
+
 def _clip_out(clip: Clip) -> ClipOut:
     storage = get_storage()
     return ClipOut(
@@ -143,7 +162,7 @@ def _clip_out(clip: Clip) -> ClipOut:
                 label=r.label,
                 status=r.status.value,
                 bytes=r.bytes,
-                url=storage.playback_url(r.storage_key) if r.storage_key else None,
+                url=_rendition_url(clip, r),
             )
             for r in clip.renditions
         ],
@@ -354,6 +373,69 @@ def patch_clip(
     return _clip_out(clip)
 
 
+@app.post(
+    "/api/clips/{clip_id}/trim", response_model=ClipOut, response_model_by_alias=True
+)
+def trim_clip(
+    clip_id: UUID, payload: ClipTrim, db: Session = Depends(get_db)
+) -> ClipOut:
+    """Shorten a clip in place.
+
+    Destructive by design: the point of trimming is that the 25 seconds of
+    walking back to lane stop existing, rather than being kept alongside.
+    """
+    clip = db.get(Clip, clip_id)
+    if clip is None or clip.deleted_at is not None:
+        raise HTTPException(404, "clip not found")
+    if payload.end_ms <= payload.start_ms:
+        raise HTTPException(422, "end must be after start")
+
+    source = db.get(ClipRendition, (clip_id, "source"))
+    if source is None or not source.storage_key or source.status != RenditionStatus.ready:
+        raise HTTPException(409, "clip has no playable source to trim")
+
+    storage = get_storage()
+    if not isinstance(storage, LocalStorage):
+        # Reading the object back would mean downloading it, trimming, and
+        # re-uploading. Worth building when there is a reason to; saying so
+        # beats failing in a way that looks like a bug.
+        raise HTTPException(501, "trimming is only implemented for local storage")
+
+    source_path = storage.path_for(source.storage_key)
+    if not source_path.exists():
+        raise HTTPException(409, "source file is missing from storage")
+
+    start_s = payload.start_ms / 1000
+    end_s = min(payload.end_ms / 1000, clip.duration_ms / 1000)
+    trimmed = source_path.with_suffix(".trimmed.mp4")
+    try:
+        trim(source_path, trimmed, start_s, end_s)
+        actual = duration_seconds(trimmed)
+        # Replace only once the new file is known good, so a failed trim never
+        # destroys the clip it was editing.
+        trimmed.replace(source_path)
+    except (MediaError, OSError) as exc:
+        trimmed.unlink(missing_ok=True)
+        raise HTTPException(422, f"could not trim: {exc}") from exc
+
+    clip.duration_ms = int(actual * 1000)
+    source.bytes = source_path.stat().st_size
+    # The key is unchanged, so this is the only thing telling anything holding a
+    # cached copy that the file behind it is different now.
+    clip.version += 1
+
+    thumb = db.get(ClipRendition, (clip_id, "thumb"))
+    if thumb is not None and thumb.storage_key:
+        thumb_path = storage.path_for(thumb.storage_key)
+        if poster(source_path, thumb_path, actual / 2):
+            thumb.bytes = thumb_path.stat().st_size
+            thumb.status = RenditionStatus.ready
+
+    db.commit()
+    db.refresh(clip)
+    return _clip_out(clip)
+
+
 @app.delete("/api/clips/{clip_id}", status_code=204)
 def delete_clip(clip_id: UUID, db: Session = Depends(get_db)) -> Response:
     clip = db.get(Clip, clip_id)
@@ -401,11 +483,11 @@ def share_page(
             "clip": clip,
             "captured_at": _as_utc(clip.captured_at),
             "uploaded_at": _as_utc(clip.uploaded_at),
-            "video_url": storage.playback_url(source.storage_key)
-            if source and source.storage_key and source.status == ready
+            "video_url": _rendition_url(clip, source)
+            if source and source.status == ready
             else None,
-            "thumb_url": storage.playback_url(thumb.storage_key)
-            if thumb and thumb.storage_key and thumb.status == ready
+            "thumb_url": _rendition_url(clip, thumb)
+            if thumb and thumb.status == ready
             else None,
             "share_url": _share_url(clip.public_slug),
             "width": meta.get("width", 1920),

@@ -62,6 +62,19 @@ class ClipOut(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class ClipTrim(BaseModel):
+    """A cut, in milliseconds from the start of the clip.
+
+    Both land on the nearest earlier keyframe, so the effective cut can be up
+    to one keyframe interval wider than asked for.
+    """
+
+    start_ms: int = Field(alias="startMs", ge=0)
+    end_ms: int = Field(alias="endMs", gt=0)
+
+    model_config = {"populate_by_name": True}
+
+
 class ClipPatch(BaseModel):
     """Every field optional. Only keys actually sent are applied, so a
     rename never silently clears the visibility."""
