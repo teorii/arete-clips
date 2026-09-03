@@ -10,7 +10,7 @@ import os
 import tempfile
 from pathlib import Path
 
-_TMP = Path(tempfile.mkdtemp(prefix="clipper_tests_"))
+_TMP = Path(tempfile.mkdtemp(prefix="arete_tests_"))
 
 # TestClient talks to http://testserver, so pointing the public base URL at the
 # same host means the presigned upload URLs it hands back are directly usable.

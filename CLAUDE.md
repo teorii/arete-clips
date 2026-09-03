@@ -1,14 +1,32 @@
-# Clipper
+# Arete
 
 Press F9, get a shareable link to the last 30 seconds of gameplay. Capture runs
 on the player's GPU; the backend only ever moves metadata.
 
-Personal project. The design authority is `docs/design/medal-question.html`:
-when a structural question comes up, check there before inventing an answer.
+## What this is
+
+A 24-hour demo, built once, used by one person. It is not a service, it will
+not have hundreds of users, and it does not need to survive traffic. The goal
+is a small application that works reliably every time, not a small version of
+a large system.
+
+`docs/design/medal-question.html` is the design authority for *structure*: when
+a question comes up about how the pieces fit together, check there. It is not a
+backlog. That document is written for 10M MAU and 1.2M clips a day, and most of
+what it calls for is the correct answer to a problem this project does not have.
+
+Do not propose or build: dedup, storage tiering, retention policies, lazy
+transcode, event pipelines, ML flywheels, auth, multi-region, resumable
+byte-range uploads, kill switches, or staged rollout. If a suggestion is
+justified by scale, cost at volume, or "when this grows", it is out of scope.
+Say so and move on.
+
+Worth doing is anything that makes the thing in front of you work better: it
+captures what you asked for, it tells you when it fails, and the link plays.
 
 ## Running it
 
-The shipped form is the desktop app: `Clipper.bat`, or `python desktop.py`.
+The shipped form is the desktop app: `Arete.bat`, or `python desktop.py`.
 That runs the API, the capture daemon and a WebView2 window in one process.
 `desktop.py --verbose` adds access logs and devtools; `--no-capture` skips
 recording; `--no-tray` makes closing the window quit. The pieces below still run standalone for development.
@@ -21,6 +39,7 @@ recording; `--no-tray` makes closing the window quit. The pieces below still run
 | Frontend (dev) | `cd frontend && npm run dev` | Port 5173, proxies `/api` to 8000 |
 | Frontend (build) | `cd frontend && npm run build` | Emits `frontend/dist`, which the server mounts |
 | Lint | `cd frontend && npm run lint` | oxlint, not eslint |
+| Icon + launcher | `.venv\Scripts\python tools\make_icon.py` then `tools\make_launcher.py` | Rebuild after touching `branding.py` |
 
 Requires ffmpeg on PATH (or installed via winget) and an NVENC-capable GPU.
 
@@ -47,10 +66,19 @@ These are load-bearing. Changing one is a design decision, not a refactor.
   out. Without it every displayed time silently shifts by the viewer's offset.
 - **The hotkey uses `RegisterHotKey`, not a keyboard hook.** League runs
   Vanguard, and a `WH_KEYBOARD_LL` hook is behaviourally a keylogger.
+- **The name and mark live in `branding.py`.** Tray, window, favicon and
+  executable resources all render from it. Windows names a running app after
+  the FileDescription of its executable, not its window title, which is the
+  only reason `.venv\Scripts\Arete.exe` exists: launched through plain
+  pythonw.exe the app is "Python" in Task Manager whatever the window says.
+  Rerun `tools/make_launcher.py` after changing the mark.
 
 ## Layout
 
 ```
+branding.py The name, colours and app mark. One source for every surface.
+tools/      make_icon.py renders the mark, make_launcher.py builds Arete.exe
+assets/     arete.ico, the icon Windows reads for taskbar and Task Manager
 server/     FastAPI. main.py routes, models.py schema, storage.py backends
 capture/    Windows client. ringbuffer.py -> clipper.py -> uploader.py
 frontend/   React + Vite clip manager, served at /app
@@ -88,12 +116,19 @@ Both are env vars in `.env`, not code changes:
 lifecycle, upload-signature enforcement and ring buffer segment selection.
 Capture itself is not covered: it needs a GPU and a live display.
 
-## Known gaps
+## Actual gaps, in order
 
-- **Not packaged.** Runs from the venv. PyInstaller would make it a single .exe.
-- Video-only: no audio capture yet.
-- Upload retry is per-clip via the journal, not byte-range resumable.
-- One hardcoded `DEV_OWNER_ID`; no auth.
-- Two `react(set-state-in-effect)` lint warnings in `useClips.ts` and
-  `ClipDetail.tsx`. The `ClipDetail` one is better fixed with a `key` prop so
-  the component remounts per clip.
+1. **No audio.** `ddagrab` is video-only. A clip with no callouts or ability
+   sounds is half a clip, and it is the first thing anyone notices.
+2. **No trim.** Saving the last 30s and keeping all 30s is the whole feature
+   working at its crudest. In and out points, snapped to keyframes so the cut
+   stays a byte copy.
+3. **Capture failure is silent.** The tray light is set once at startup and
+   never updated, so if ffmpeg dies mid-session the app looks fine and F9 just
+   stops working. Watch the process and say so.
+4. **Links only resolve on this machine.** Only matters if someone else is ever
+   going to open one. `STORAGE_BACKEND=r2` plus a real host is the fix, and it
+   is configuration, not code.
+
+Not gaps, deliberately: auth, packaging, and everything in the do-not-build
+list above.

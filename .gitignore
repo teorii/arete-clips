@@ -14,6 +14,9 @@ htmlcov/
 node_modules/
 frontend/dist/
 
+# runtime log, written when launched without a console
+*.log
+
 # local data: clips, the rolling buffer, the dev database
 clips_local/
 clips_out/

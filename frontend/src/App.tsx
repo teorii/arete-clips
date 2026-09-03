@@ -102,7 +102,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <h1>Clips</h1>
+        <h1>Arete</h1>
         <span className="count">
           {items.length}
           {hasMore ? '+' : ''}

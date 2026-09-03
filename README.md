@@ -1,4 +1,4 @@
-# Clipper
+# Arete
 
 Press F9, get a link to the last 30 seconds of your game.
 
@@ -70,6 +70,9 @@ result for dedup, extracting a poster frame) rather than by the remux itself.
 | `frontend/src/App.tsx` | Clip manager: grid, search, pinned filter, recent links. |
 | `frontend/src/ClipDetail.tsx` | Player with rename, pin, copy, delete and arrow-key navigation. |
 | `frontend/src/useClips.ts` | Cursor-paginated list with stale-response guarding. |
+| `branding.py` | The name, the colours and the drawing of the app mark. One source for tray, window and executable. |
+| `tools/make_icon.py` | Renders that mark to `assets/arete.ico` and the web favicon. |
+| `tools/make_launcher.py` | Builds `.venv\Scripts\Arete.exe`, the launcher that gives Task Manager the name and icon. |
 
 ## Setup
 
@@ -78,6 +81,8 @@ winget install --id Gyan.FFmpeg -e
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 copy .env.example .env
+.venv\Scripts\python tools\make_icon.py
+.venv\Scripts\python tools\make_launcher.py
 ```
 
 Find the display you play on, then set `DDAGRAB_OUTPUT_IDX` in `.env`:
@@ -88,7 +93,7 @@ Find the display you play on, then set `DDAGRAB_OUTPUT_IDX` in `.env`:
 
 ## Run it as an app
 
-Double-click **`Clipper.bat`**. That opens a native window with the API and the
+Double-click **`Arete.bat`**. That opens a native window with the API and the
 capture daemon running inside the same process, so there is nothing to start in
 a terminal and no URL to type.
 
@@ -96,13 +101,13 @@ a terminal and no URL to type.
 - **Closing the window does not stop recording.** It hides to the tray, because
   a recorder that quits when you close its window is no use mid-game. Quit for
   real from the tray menu.
-- The **tray icon** doubles as a status light: red means the ring buffer is
-  running, grey means capture could not start and only the library works.
-  Right-click it to clip, reopen, or quit. Windows 11 files new tray icons
-  under the `^` overflow, so drag it onto the taskbar to keep it visible.
-- `Clipper (debug).bat` is the same thing with a console attached, which is
+- The **tray icon** doubles as a status light: the A is warm while the ring
+  buffer is running and grey when capture could not start and only the library
+  works. Right-click it to clip, reopen, or quit. Windows 11 files new tray
+  icons under the `^` overflow, so drag it onto the taskbar to keep it visible.
+- `Arete (debug).bat` is the same thing with a console attached, which is
   where you watch clip timings and the share link appear.
-- Logs land in `clipper.log` when launched without a console.
+- Logs land in `arete.log` when launched without a console.
 
 The window is WebView2, the browser engine already built into Windows 11, so
 there is no second runtime to install and nothing bundled.

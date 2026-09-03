@@ -14,13 +14,24 @@ export interface RecentLink {
   copiedAt: string
 }
 
-const KEY = 'clipper.recent-links'
+const KEY = 'arete.recent-links'
+// The key the app used before it was renamed. Read once and carried over, so
+// the rename does not silently drop links someone had already shared.
+const LEGACY_KEY = 'clipper.recent-links'
 const LIMIT = 12
 
 export function loadRecent(): RecentLink[] {
   // Storage throws outright in some privacy modes, so never let it break render.
   try {
-    const raw = localStorage.getItem(KEY)
+    let raw = localStorage.getItem(KEY)
+    if (!raw) {
+      const legacy = localStorage.getItem(LEGACY_KEY)
+      if (legacy) {
+        localStorage.setItem(KEY, legacy)
+        localStorage.removeItem(LEGACY_KEY)
+        raw = legacy
+      }
+    }
     if (!raw) return []
     const parsed: unknown = JSON.parse(raw)
     return Array.isArray(parsed) ? (parsed as RecentLink[]) : []

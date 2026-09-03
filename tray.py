@@ -5,8 +5,8 @@ during a game, so closing hides the window instead of quitting. The tray icon
 is how you bring it back, clip without touching the keyboard, and quit for
 real.
 
-The icon doubles as a status light: red means the ring buffer is running, grey
-means capture failed to start and only the library works.
+The icon doubles as a status light: the mark is warm while the ring buffer is
+running and grey when capture failed to start and only the library works.
 """
 
 from __future__ import annotations
@@ -15,19 +15,12 @@ import threading
 from collections.abc import Callable
 
 import pystray
-from PIL import Image, ImageDraw
 
+from branding import APP_NAME, icon_image
+
+# Windows hands the notification area a 16px icon on a 100% display and scales
+# from whatever it is given, so render above the largest DPI it will ask for.
 _SIZE = 64
-
-
-def _icon_image(recording: bool) -> Image.Image:
-    """Drawn rather than shipped as an asset, so there is no file to lose."""
-    image = Image.new("RGBA", (_SIZE, _SIZE), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(image)
-    draw.rounded_rectangle([2, 2, _SIZE - 3, _SIZE - 3], radius=15, fill=(20, 25, 34, 255))
-    dot = (248, 96, 122, 255) if recording else (110, 122, 140, 255)
-    draw.ellipse([19, 19, _SIZE - 20, _SIZE - 20], fill=dot)
-    return image
 
 
 class Tray:
@@ -44,14 +37,18 @@ class Tray:
 
         menu = pystray.Menu(
             # default=True makes this fire on a double-click of the icon.
-            pystray.MenuItem("Open Clipper", self._open, default=True),
+            pystray.MenuItem(f"Open {APP_NAME}", self._open, default=True),
             pystray.MenuItem("Clip the last 30 seconds", self._clip),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(self._status_text, None, enabled=False),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Quit Clipper", self._quit),
+            pystray.MenuItem(f"Quit {APP_NAME}", self._quit),
         )
-        self.icon = pystray.Icon("clipper", _icon_image(True), "Clipper", menu)
+        # The third argument is the hover tooltip, which is the only place the
+        # name shows once the window is hidden.
+        self.icon = pystray.Icon(
+            APP_NAME.lower(), icon_image(_SIZE, recording=True), APP_NAME, menu
+        )
         self._thread = threading.Thread(target=self.icon.run, name="tray", daemon=True)
 
     # pystray passes the item into callbacks; the app does not care about it.
@@ -82,12 +79,12 @@ class Tray:
     def set_recording(self, recording: bool) -> None:
         self.recording = recording
         try:
-            self.icon.icon = _icon_image(recording)
+            self.icon.icon = icon_image(_SIZE, recording=recording)
             self.icon.update_menu()
         except Exception:  # noqa: BLE001
             pass  # cosmetic only, never worth taking the app down for
 
-    def notify(self, message: str, title: str = "Clipper") -> None:
+    def notify(self, message: str, title: str = APP_NAME) -> None:
         """Balloon notification. Best effort: some Windows configurations
         suppress these entirely, and a missing toast is not worth an error."""
         try:
