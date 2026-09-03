@@ -98,6 +98,12 @@ def test_sources_are_labelled_for_the_pages_that_show_them(monkeypatch):
         lambda: [{"process": "League.exe", "display_index": 1,
                   "title": "League", "width": 2560, "height": 1440}],
     )
+    # ddagrab's index is not Windows' display number, and labelling by index
+    # named a different screen than Display Settings does.
+    monkeypatch.setattr(
+        "capture.windows.monitors",
+        lambda: [{"number": 2}, {"number": 3}],
+    )
 
     api = setup_module.SetupApi(on_saved=lambda: None, on_skipped=lambda: None)
     found = api.sources()
@@ -105,8 +111,8 @@ def test_sources_are_labelled_for_the_pages_that_show_them(monkeypatch):
     # One entry per display, named by what is on it: a program list alongside
     # implied capture could select a window, and it cannot.
     assert "programs" not in found
-    assert found["displays"][0]["label"] == "Display 1 (1920x1080)"
-    assert found["displays"][1]["label"] == "Display 2 (2560x1440) - League"
+    assert found["displays"][0]["label"] == "Display 2 (1920x1080)"
+    assert found["displays"][1]["label"] == "Display 3 (2560x1440) - League"
     for entry in found["displays"]:
         assert entry["label"].strip(), "an unlabelled entry renders as a blank row"
 

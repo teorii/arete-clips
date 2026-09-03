@@ -45,6 +45,10 @@ export default function App() {
   // Which display is being recorded. Worth having here and not only in
   // settings: it is the one setting you change because of what is on screen
   // right now, and walking to another page to do it loses the moment.
+  // A held clip has no server record, so it cannot use the clip detail sheet.
+  // It still deserves watching before you decide it is worth a link.
+  const [preview, setPreview] = useState<HeldClip | null>(null)
+
   const [sources, setSources] = useState<Sources | null>(null)
   const [source, setSource] = useState(0)
   useEffect(() => {
@@ -343,6 +347,7 @@ export default function App() {
                 key={clip.path}
                 clip={clip}
                 busy={busy === clip.path}
+                onOpen={() => setPreview(clip)}
                 onShare={() => void shareHeld(clip)}
                 onDiscard={() => void discard(clip)}
                 onRename={(title) => void rename(clip, title)}
@@ -391,6 +396,18 @@ export default function App() {
         />
       )}
 
+      {preview && (
+        <HeldPreview
+          clip={preview}
+          onClose={() => setPreview(null)}
+          onShare={() => {
+            const chosen = preview
+            setPreview(null)
+            void shareHeld(chosen)
+          }}
+        />
+      )}
+
       {toast && <div className="toast">{toast}</div>}
     </div>
   )
@@ -417,9 +434,54 @@ function BrandMark() {
   )
 }
 
+/** A held clip, played from the machine that captured it. */
+function HeldPreview({
+  clip,
+  onClose,
+  onShare,
+}: {
+  clip: HeldClip
+  onClose: () => void
+  onShare: () => void
+}) {
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <div className="sheet-head">
+          <h2>{clip.title ?? 'Clip'}</h2>
+          <button className="icon" onClick={onClose} title="Close">
+            &#10005;
+          </button>
+        </div>
+        <div className="stage">
+          {clip.previewUrl ? (
+            <video src={clip.previewUrl} controls autoPlay />
+          ) : (
+            <div className="pending">
+              This clip is on this machine and the library it uploads to is
+              somewhere else, so nothing here can play it.
+            </div>
+          )}
+        </div>
+        <div className="chips">
+          <span className="chip">{formatDuration(clip.durationMs)}</span>
+          <span className="chip">{(clip.bytes / 1_048_576).toFixed(0)} MB</span>
+          <span className="chip">No link yet</span>
+        </div>
+        <div className="sheet-actions">
+          <button className="primary" onClick={onShare}>
+            Generate link
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function HeldCard({
   clip,
   busy,
+  onOpen,
   onShare,
   onDiscard,
   onRename,
@@ -427,6 +489,7 @@ function HeldCard({
 }: {
   clip: HeldClip
   busy: boolean
+  onOpen: () => void
   onShare: () => void
   onDiscard: () => void
   onRename: (title: string) => void
@@ -434,7 +497,7 @@ function HeldCard({
 }) {
   return (
     <article className="card held-card">
-      <div className="thumb">
+      <button className="thumb" onClick={onOpen} aria-label="Watch this clip">
         {clip.thumb ? (
           <img src={clip.thumb} alt="" />
         ) : (
@@ -442,7 +505,7 @@ function HeldCard({
         )}
         <span className="dur">{formatDuration(clip.durationMs)}</span>
         <span className="badge-new">No link yet</span>
-      </div>
+      </button>
       <div className="card-body">
         <EditableTitle
           value={clip.title}

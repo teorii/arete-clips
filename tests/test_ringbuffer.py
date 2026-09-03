@@ -63,7 +63,14 @@ def test_snapshot_takes_the_newest_segments_in_time_order(tmp_path):
     # Staged parts are renamed sequentially, and must be in playback order.
     assert [p.name for p in staged] == [f"part{i:03d}.ts" for i in range(len(staged))]
     # The newest source segment must be included: it holds the payoff moment.
-    assert staged[-1].read_bytes() == created[-1].read_bytes()
+    # Trimmed to whole packets on the way out: the newest segment is copied
+    # while ffmpeg is still writing it, and half a packet is what a decoder
+    # reports as a damaged bitstream.
+    from capture.ringbuffer import _TS_PACKET
+
+    source = created[-1].read_bytes()
+    keep = len(source) - len(source) % _TS_PACKET
+    assert staged[-1].read_bytes() == source[:keep]
 
 
 def test_snapshot_copes_with_a_partially_filled_ring(tmp_path):
@@ -95,3 +102,35 @@ def test_snapshot_skips_zero_length_segments(tmp_path):
     staged = ring.snapshot(tmp_path / "staging")
     assert all(p.stat().st_size > 0 for p in staged)
     assert len(staged) == 5
+
+
+def test_a_staged_segment_is_cut_back_to_whole_packets(tmp_path):
+    """The newest segment is copied while ffmpeg is still writing it, so it
+    ends part-way through a packet. A decoder meeting half a packet reports a
+    damaged bitstream, which is visible as corruption during playback."""
+    from capture.ringbuffer import _TS_PACKET, _trim_to_whole_packets
+
+    torn = tmp_path / "part000.ts"
+    torn.write_bytes(b"x" * (_TS_PACKET * 3 + 57))
+
+    assert _trim_to_whole_packets(torn) == _TS_PACKET * 3
+    assert torn.stat().st_size % _TS_PACKET == 0
+
+
+def test_a_whole_segment_is_left_alone(tmp_path):
+    from capture.ringbuffer import _TS_PACKET, _trim_to_whole_packets
+
+    intact = tmp_path / "part001.ts"
+    intact.write_bytes(b"y" * (_TS_PACKET * 4))
+
+    assert _trim_to_whole_packets(intact) == _TS_PACKET * 4
+    assert intact.stat().st_size == _TS_PACKET * 4
+
+
+def test_a_fragment_shorter_than_one_packet_is_dropped(tmp_path):
+    from capture.ringbuffer import _trim_to_whole_packets
+
+    scrap = tmp_path / "part002.ts"
+    scrap.write_bytes(b"z" * 40)
+
+    assert _trim_to_whole_packets(scrap) == 0

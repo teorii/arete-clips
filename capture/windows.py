@@ -13,6 +13,7 @@ program name rather than by remembering that League is on monitor 2.
 from __future__ import annotations
 
 import ctypes
+import re
 from ctypes import wintypes
 
 _user32 = ctypes.windll.user32
@@ -32,10 +33,29 @@ class _MONITORINFO(ctypes.Structure):
                 ("rcWork", _RECT), ("dwFlags", ctypes.c_ulong)]
 
 
+class _MONITORINFOEXW(ctypes.Structure):
+    """MONITORINFO plus szDevice, which carries the name Windows uses.
+
+    Worth the extra field: ddagrab indexes displays from zero in enumeration
+    order, and Windows numbers them from one in an order of its own. Labelling
+    an index as "Display 2" therefore named a different screen than the one
+    Display Settings calls Display 2, which reads as two of them being swapped.
+    """
+
+    _fields_ = [("cbSize", ctypes.c_ulong), ("rcMonitor", _RECT),
+                ("rcWork", _RECT), ("dwFlags", ctypes.c_ulong),
+                ("szDevice", ctypes.c_wchar * 32)]
+
+
 _ENUM_MONITORS = ctypes.WINFUNCTYPE(
     ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(_RECT), ctypes.c_double
 )
 _ENUM_WINDOWS = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+
+
+def _display_number(device: str) -> int | None:
+    match = re.search(r"DISPLAY(\d+)", device or "")
+    return int(match.group(1)) if match else None
 
 
 def monitors() -> list[dict]:
@@ -43,8 +63,8 @@ def monitors() -> list[dict]:
     found: list[dict] = []
 
     def collect(handle, _dc, _rect, _data):
-        info = _MONITORINFO()
-        info.cbSize = ctypes.sizeof(_MONITORINFO)
+        info = _MONITORINFOEXW()
+        info.cbSize = ctypes.sizeof(_MONITORINFOEXW)
         if _user32.GetMonitorInfoW(handle, ctypes.byref(info)):
             box = info.rcMonitor
             found.append({
@@ -54,6 +74,10 @@ def monitors() -> list[dict]:
                 "width": box.right - box.left,
                 "height": box.bottom - box.top,
                 "primary": bool(info.dwFlags & 1),
+                # r"\.\DISPLAY2" -> 2, the number on the screen in Windows'
+                # own Display Settings.
+                "number": _display_number(info.szDevice),
+                "device": info.szDevice,
             })
         return 1
 

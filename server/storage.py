@@ -62,6 +62,25 @@ class StorageBackend(ABC):
         """Replace an object from a local file, returning its size."""
 
 
+def sign_held(name: str, expires: int) -> str:
+    """Sign a held clip's name so the library can play it.
+
+    A <video> element cannot send an API key header, and this install may be
+    reachable through a tunnel, so the file cannot simply be public. The same
+    secret that signs an upload target signs a short-lived preview instead.
+    """
+    from .config import get_settings
+
+    secret = get_settings().upload_secret.encode()
+    return hmac.new(secret, f"held:{name}:{expires}".encode(), hashlib.sha256).hexdigest()
+
+
+def verify_held(name: str, expires: int, signature: str) -> bool:
+    if expires < int(time.time()):
+        return False
+    return hmac.compare_digest(sign_held(name, expires), signature)
+
+
 class LocalStorage(StorageBackend):
     """Dev backend. Mirrors the presigned contract with an HMAC-signed URL."""
 

@@ -539,6 +539,33 @@ def root() -> RedirectResponse:
     return RedirectResponse("/app/")
 
 
+@app.get("/api/held/{name}")
+def held_clip_file(name: str, expires: int = Query(...), sig: str = Query(...)) -> FileResponse:
+    """A clip captured on this machine that has no link yet.
+
+    Held clips exist only as files next to the app: the server has never heard
+    of them, which is the point of holding them. Deciding whether one is worth
+    a link meant guessing from a thumbnail, so the library can play them from
+    here instead.
+
+    Only files directly inside the capture output directory are served, and the
+    name is used as a name rather than a path, so nothing outside it is
+    reachable however the request is spelled.
+    """
+    from paths import data_dir
+
+    from .storage import verify_held
+
+    if not verify_held(Path(name).name, expires, sig):
+        raise HTTPException(status_code=404, detail="No such clip.")
+
+    folder = (data_dir() / "clips_out").resolve()
+    target = (folder / Path(name).name).resolve()
+    if target.parent != folder or not target.is_file():
+        raise HTTPException(status_code=404, detail="No such clip.")
+    return FileResponse(target, media_type="video/mp4")
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     """Reachability, nothing more. Setup uses it to tell a real server from a

@@ -501,6 +501,14 @@ def main() -> int:
         print(f"{APP_NAME} is already running. Bringing its window forward.")
         return 0
 
+    # WebView2 keeps localStorage in its user data folder, and left to itself
+    # it picks one beside the executable. A one-file build runs from a temp
+    # directory that is deleted on exit, so every launch got a fresh profile:
+    # the links you had copied were gone, and the saved API key with them.
+    profile = data_dir() / "webview"
+    profile.mkdir(parents=True, exist_ok=True)
+    os.environ["WEBVIEW2_USER_DATA_FOLDER"] = str(profile)
+
     # ffmpeg and cloudflared run as long as the app does. Without this they
     # survive it being killed, and the orphaned encoder holds the ring buffer
     # that the next launch needs.

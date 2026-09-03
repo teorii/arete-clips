@@ -18,6 +18,7 @@ import re
 import threading
 from collections.abc import Callable
 from pathlib import Path
+from urllib.parse import quote
 
 from paths import bundle_dir, config_file
 from problems import warn
@@ -135,6 +136,36 @@ def _later(action: Callable[[], None]) -> None:
     threading.Timer(0.15, run).start()
 
 
+def _preview_url(mp4_path: str) -> str:
+    """A URL the library can play a held clip from.
+
+    Held clips are files on this machine that the server has never heard of, so
+    deciding whether one deserves a link meant guessing from a thumbnail. Empty
+    when this install is a client of another Arete: the file is here and the
+    server is not.
+    """
+    import time
+
+    from capture.config import get_capture_settings
+    from server.storage import sign_held
+
+    try:
+        # Hosting is decided by where the client sends clips, not by the public
+        # address: a host with a tunnel still serves this page itself. Relative,
+        # so it resolves against whichever of the two the window is showing.
+        if not _is_local(get_capture_settings().api_base_url):
+            return ""
+        name = Path(mp4_path).name
+        expires = int(time.time()) + 12 * 3600
+        return (
+            f"/api/held/{quote(name)}"
+            f"?expires={expires}&sig={sign_held(name, expires)}"
+        )
+    except Exception as exc:  # noqa: BLE001
+        warn("preview link", exc, "held clips cannot be played before sharing")
+        return ""
+
+
 def _is_local(url: str) -> bool:
     """Whether an address points at this machine, which is what makes an
     install a host rather than a client of someone else's."""
@@ -220,6 +251,7 @@ class AppBridge:
                 "bytes": entry.get("source_bytes", 0),
                 "title": entry.get("title"),
                 "thumb": _thumbnail_data_uri(entry.get("thumb_path")),
+                "previewUrl": _preview_url(entry["mp4_path"]),
             }
             for entry in entries
         ]
@@ -334,11 +366,26 @@ class SetupApi(AppBridge):
         # one showed another. What was useful about them, knowing which monitor
         # the game is on, is kept here as part of the name.
         entries = []
+        # ddagrab counts displays from zero in enumeration order; Windows
+        # numbers them from one in an order of its own, and on this desk the
+        # two disagree about every screen. Label with the number Display
+        # Settings shows, and keep the ddagrab index as the value.
+        from capture.windows import monitors
+
+        try:
+            numbers = [m.get("number") for m in monitors()]
+        except OSError as exc:
+            warn("display names", exc, "displays will be numbered as captured")
+            numbers = []
+
         for display in list_displays():
-            label = (
-                f"Display {display['index'] + 1} "
-                f"({display['width']}x{display['height']})"
+            index = display["index"]
+            shown = (
+                numbers[index]
+                if index < len(numbers) and numbers[index]
+                else index + 1
             )
+            label = f"Display {shown} ({display['width']}x{display['height']})"
             running = on_display.get(display["index"], [])
             if running:
                 shown = ", ".join(running[:3])

@@ -18,6 +18,10 @@ export interface HeldClip {
   title: string | null
   /** Inline poster: a held clip has no URL to serve one from. */
   thumb: string | null
+  /** Signed and short-lived, so the clip can be watched before it is shared.
+   *  Empty when this install sends its clips to another Arete: the file is
+   *  here and the server that would serve it is not. */
+  previewUrl: string
 }
 
 export interface Preferences {

@@ -27,6 +27,31 @@ from .config import CaptureSettings
 from .ffmpeg import FFMPEG
 
 
+
+# MPEG-TS is a stream of fixed 188-byte packets. The newest segment is copied
+# while ffmpeg is still writing it, so it almost always ends part-way through
+# one, and a decoder meeting half a packet reports a damaged bitstream:
+#
+#     [h264] error while decoding MB 46 71, bytestream -11
+#
+# The whole packets before the tear are perfectly good. Dropping the fragment
+# costs at most 188 bytes of the final frame and removes the corruption.
+_TS_PACKET = 188
+
+
+def _trim_to_whole_packets(path: Path) -> int:
+    """Cut a staged segment back to its last complete packet. Returns its size."""
+    try:
+        size = path.stat().st_size
+        whole = size - (size % _TS_PACKET)
+        if whole != size:
+            with path.open("r+b") as handle:
+                handle.truncate(whole)
+        return whole
+    except OSError as exc:
+        warn("ring buffer", exc, f"{path.name} left out of this clip")
+        return 0
+
 class RingBuffer:
     def __init__(self, settings: CaptureSettings) -> None:
         self.s = settings
@@ -184,6 +209,6 @@ class RingBuffer:
                 # clip, just a shorter one, which is worth knowing about.
                 warn("ring buffer", exc, f"{src.name} missing from this clip")
                 continue
-            if dst.stat().st_size > 0:
+            if _trim_to_whole_packets(dst) > 0:
                 staged.append(dst)
         return staged
