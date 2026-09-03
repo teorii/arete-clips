@@ -48,7 +48,7 @@ import webview  # noqa: E402
 from branding import APP_ID, APP_NAME  # noqa: E402
 from capture.daemon import Daemon  # noqa: E402
 from child_processes import die_with_us  # noqa: E402
-from capture.hotkey import pump, stop as hotkey_stop  # noqa: E402
+from capture.hotkey import pump, running_elevated, stop as hotkey_stop  # noqa: E402
 from paths import bundle_dir, config_file, is_configured  # noqa: E402
 from problems import warn  # noqa: E402
 from services import Tunnels, update_config  # noqa: E402
@@ -350,6 +350,13 @@ class CaptureService:
                 key = self.daemon.s.hotkey_vk
                 name = _KEY_NAMES.get(key, f"vk {key:#04x}")
                 print(f"Hotkey armed: {name} clips the last {self.daemon.s.clip_seconds}s")
+                if not running_elevated():
+                    # Registering the key is not the same as being given it.
+                    print(
+                        "  Note: Arete is not running as administrator, so this "
+                        "key will not reach it while a game that is stays in "
+                        "front. League does, through Vanguard."
+                    )
 
             pump(self.daemon.s.hotkey_vk, self._on_hotkey, on_ready=armed)
         except Exception as exc:  # noqa: BLE001

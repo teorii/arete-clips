@@ -51,6 +51,21 @@ def stop(thread_id: int) -> None:
         _user32.PostThreadMessageW(thread_id, WM_QUIT, 0, 0)
 
 
+def running_elevated() -> bool:
+    """Whether this process has administrator rights.
+
+    Matters because a registered hotkey is not delivered to a process of lower
+    integrity than the window in front. League runs Vanguard, which is
+    elevated, so an ordinary Arete registers the key successfully and then
+    never hears it while the game has focus. Nothing fails; the key simply does
+    nothing, which is the worst way for this app to be wrong.
+    """
+    try:
+        return bool(ctypes.WinDLL("shell32").IsUserAnAdmin())
+    except OSError:
+        return False
+
+
 def pump(
     vk: int,
     on_press: Callable[[], None],

@@ -170,6 +170,16 @@ def _preview_url(mp4_path: str) -> str:
         return ""
 
 
+def _elevated() -> bool:
+    try:
+        from capture.hotkey import running_elevated
+
+        return running_elevated()
+    except Exception as exc:  # noqa: BLE001
+        warn("elevation", exc, "settings cannot say whether the hotkey reaches games")
+        return True
+
+
 def _is_local(url: str) -> bool:
     """Whether an address points at this machine, which is what makes an
     install a host rather than a client of someone else's."""
@@ -440,6 +450,7 @@ class SetupApi(AppBridge):
             "invite": settings.invite_code if hosting else "",
             "folder": str(data_dir()),
             "audio": audio,
+            "elevated": _elevated(),
         }
 
     def test(self, url: str, key: str) -> dict:

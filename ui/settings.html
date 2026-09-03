@@ -5,7 +5,12 @@
 <title>Arete settings</title>
 <link rel="stylesheet" href="app.css">
 </head>
-<body>
+<body class="loading">
+  <!-- Every control starts on a default that is almost certainly not what this
+       machine is set to, and the bridge takes a moment to answer. Showing them
+       first meant a second of confident wrong answers: a hotkey you do not use
+       and a display you are not recording. -->
+  <div class="waiting">Reading your settings&hellip;</div>
   <h1>Settings</h1>
   <div class="sub">Arete keeps recording while this is open. Changing anything
     under Recording restarts the capture when you save.</div>
@@ -14,8 +19,8 @@
     <h2>Recording</h2>
     <label for="display">Source</label>
     <select id="display"><option>Reading&hellip;</option></select>
-    <div class="hint">Capture duplicates a whole display. Each is named by
-      what is running on it, so you do not have to remember which is which.</div>
+    <div class="hint">Capture duplicates a whole display, so a single window
+      cannot be recorded on its own. Numbered as Windows numbers them.</div>
 
     <label for="seconds">Clip length</label>
     <select id="seconds">
@@ -145,8 +150,18 @@
         'follows the default device if you change it. Microphones are never ' +
         'used.</div>';
 
+    // Registering the hotkey is not the same as being given it: Windows will
+    // not deliver one to a process of lower integrity than the window in front.
+    const rights = install.elevated
+      ? ''
+      : '<div class="check"><b>Hotkey</b> <span class="bad">Will not reach ' +
+        'games that run as administrator.</span></div>' +
+        '<div class="hint">League does, through Vanguard. Close Arete, ' +
+        'right-click it and choose Run as administrator.</div>';
+
     let html =
       '<div class="check"><b>Clips</b> <span>' + where + '</span></div>' +
+      rights +
       audio +
       '<div class="check"><b>Folder</b> <code>' + install.folder + '</code></div>';
     if (install.invite) {
@@ -199,6 +214,7 @@
 
     saved = snapshot();
     refreshSave();
+    document.body.classList.remove('loading');
   }
 
   for (const id of CONFIG.concat(CHECKS, ['held_warning_gb'])) {
@@ -244,7 +260,13 @@
 
   $('cancel').onclick = () => window.pywebview.api.close_settings();
 
-  ready().then(load);
+  ready().then(load).catch((err) => {
+    // Better to say why than to sit on a spinner: the bridge only exists
+    // inside the app, and a page that cannot reach it never loads at all.
+    document.body.classList.remove('loading');
+    $('status').className = 'status bad';
+    $('status').textContent = 'Could not read settings: ' + err;
+  });
 </script>
 </body>
 </html>
