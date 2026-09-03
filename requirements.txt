@@ -14,3 +14,4 @@ pywebview==6.2.1
 # Tray icon, so closing the window keeps the recorder running.
 pystray==0.19.5
 pillow==12.1.0
+PyAudioWPatch>=0.2.12

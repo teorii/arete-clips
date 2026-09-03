@@ -61,6 +61,9 @@ class RingBuffer:
         self._log = None
         self.audio_device: str | None = None
         self._audio_resolved = False
+        # The default playback device, when one could be opened. Its samples go
+        # down this process's stdin so ffmpeg times them against the picture.
+        self.loopback = None
 
     # ------------------------------------------------------------- lifecycle
 
@@ -71,7 +74,14 @@ class RingBuffer:
         every restart the watchdog performs.
         """
         if not self._audio_resolved:
-            self.audio_device = find_loopback_device(self.s.audio_device)
+            # Desktop sound comes from WASAPI now, which can follow the default
+            # playback device; dshow only ever saw capture hardware. A named
+            # device still wins, for a machine where that is what someone wants.
+            wanted = (self.s.audio_device or "").strip().lower()
+            self.audio_device = (
+                None if wanted in ("", "auto", "none")
+                else find_loopback_device(self.s.audio_device)
+            )
             self._audio_resolved = True
         return self.audio_device
 
@@ -79,13 +89,32 @@ class RingBuffer:
         s = self.s
         gop = s.segment_seconds * s.capture_fps
         audio = self.resolve_audio()
+        piped = self.loopback is not None and self.loopback.available
 
         args = [
-            FFMPEG, "-hide_banner", "-loglevel", "warning", "-nostdin",
+            FFMPEG, "-hide_banner", "-loglevel", "warning",
             "-f", "lavfi",
             "-i", f"ddagrab=output_idx={s.ddagrab_output_idx}:framerate={s.capture_fps}",
         ]
-        if audio:
+        if piped:
+            # Raw samples on stdin, timestamped by ffmpeg as they arrive. One
+            # clock for both streams, which is the entire reason for the pipe.
+            args += [
+                "-thread_queue_size", "4096",
+                "-f", "s16le",
+                "-ar", str(self.loopback.rate),
+                "-ac", str(self.loopback.channels),
+            ]
+            # Whatever latency the device adds before its samples reach us.
+            # ffmpeg times both inputs itself, so this starts at nothing and
+            # exists for hardware that still needs a nudge.
+            if s.audio_offset_ms:
+                args += ["-itsoffset", f"{s.audio_offset_ms / 1000.0:.3f}"]
+            args += [
+                "-i", "pipe:0",
+                "-map", "0:v", "-map", "1:a",
+            ]
+        elif audio:
             # A generous queue: the audio device and the screen do not produce
             # at the same cadence, and a full queue shows up as dropped sound.
             args += [
@@ -107,7 +136,7 @@ class RingBuffer:
             "-g", str(gop), "-forced-idr", "1",
             "-force_key_frames", f"expr:gte(t,n_forced*{s.segment_seconds})",
         ]
-        if audio:
+        if piped or audio:
             args += ["-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2"]
         args += [
             "-f", "segment",
@@ -126,13 +155,16 @@ class RingBuffer:
         for stale in self.dir.glob("*.ts"):
             stale.unlink(missing_ok=True)
         self._log = self.log_path.open("w", encoding="utf-8", errors="replace")
+        piped = self.loopback is not None and self.loopback.available
         self.proc = subprocess.Popen(
             self.command(),
             stdout=self._log,
             stderr=subprocess.STDOUT,
-            stdin=subprocess.DEVNULL,
+            stdin=subprocess.PIPE if piped else subprocess.DEVNULL,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
+        if piped:
+            self.loopback.begin(self.proc.stdin)
 
     def is_running(self) -> bool:
         return self.proc is not None and self.proc.poll() is None
@@ -194,6 +226,7 @@ class RingBuffer:
         segments = sorted(self.dir.glob("*.ts"), key=lambda p: p.stat().st_mtime)
         if not segments:
             return []
+
 
         wanted = self.s.segments_per_clip + 1  # +1 for the in-progress segment
         selected = segments[-wanted:]

@@ -76,7 +76,6 @@ def write_config(values: dict[str, object]) -> Path:
     hosting = str(values.get("mode", "solo")) == "solo"
     updates = {
         "API_BASE_URL": "http://localhost:8000" if hosting else str(values["url"]).rstrip("/"),
-        "ARETE_API_KEY": "" if hosting else str(values["key"]).strip(),
         "DDAGRAB_OUTPUT_IDX": str(int(values["display"])),
         "CLIP_SECONDS": str(seconds),
         # Enough headroom that a clip is never cut short by the ring wrapping.
@@ -90,6 +89,19 @@ def write_config(values: dict[str, object]) -> Path:
     # write a default over whatever the config already says.
     if values.get("bitrate"):
         updates["CAPTURE_BITRATE"] = str(values["bitrate"])
+    if values.get("audioOffsetMs") is not None:
+        updates["AUDIO_OFFSET_MS"] = str(int(values["audioOffsetMs"]))
+
+    # A hosting install issues its own key on first start, and this file is
+    # rewritten every time the source or a setting changes. Blanking the key
+    # here therefore un-authenticated the machine mid-session: the clip you had
+    # just taken was refused, and it only worked again after a restart minted a
+    # new account. Written once, when there is nothing to lose.
+    if hosting:
+        if not re.search(r"^ARETE_API_KEY=.+$", existing, flags=re.M):
+            updates["ARETE_API_KEY"] = ""
+    else:
+        updates["ARETE_API_KEY"] = str(values["key"]).strip()
 
     text = existing
     for key, value in updates.items():
@@ -102,14 +114,6 @@ def write_config(values: dict[str, object]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text.lstrip("\n"), encoding="utf-8")
     return path
-
-
-# Windows' own furniture. These are on every display and name none of them
-# usefully, so they only make the list harder to read.
-_SHELL_PROCESSES = frozenset({
-    "ApplicationFrameHost", "TextInputHost", "SystemSettings", "ShellExperienceHost",
-    "SearchHost", "StartMenuExperienceHost", "Microsoft.Notes", "RtkUWP", "explorer",
-})
 
 
 def _later(action: Callable[[], None]) -> None:
@@ -335,6 +339,7 @@ class SetupApi(AppBridge):
             "seconds": settings.clip_seconds,
             "hotkey": f"0x{settings.hotkey_vk:02X}",
             "bitrate": settings.capture_bitrate,
+            "audioOffsetMs": settings.audio_offset_ms,
         }
 
     def sources(self) -> dict:
@@ -344,40 +349,23 @@ class SetupApi(AppBridge):
         is worth doing once during setup and not every time a dropdown opens.
         """
         from capture.probe import list_displays
-        from capture.windows import visible_windows
-
-        try:
-            programs = visible_windows()
-        except OSError as exc:
-            warn("visible windows", exc, "only displays will be offered")
-            programs = []
-        on_display: dict[int, list[str]] = {}
-        for program in programs:
-            name = program["process"].removesuffix(".exe")
-            if name in _SHELL_PROCESSES:
-                continue
-            names = on_display.setdefault(program["display_index"], [])
-            if name not in names:
-                names.append(name)
-
-        # One entry per display, because that is what capture can actually
-        # select. Offering programs as well implied it could record a single
-        # window, and several of them mapped to the same display, so choosing
-        # one showed another. What was useful about them, knowing which monitor
-        # the game is on, is kept here as part of the name.
-        entries = []
-        # ddagrab counts displays from zero in enumeration order; Windows
-        # numbers them from one in an order of its own, and on this desk the
-        # two disagree about every screen. Label with the number Display
-        # Settings shows, and keep the ddagrab index as the value.
         from capture.windows import monitors
 
+        # ddagrab counts displays from zero in enumeration order; Windows
+        # numbers them from one in an order of its own, and on a multi-monitor
+        # desk the two disagree. Label with the number Display Settings shows,
+        # and keep the ddagrab index as the value.
         try:
             numbers = [m.get("number") for m in monitors()]
         except OSError as exc:
             warn("display names", exc, "displays will be numbered as captured")
             numbers = []
 
+        # A number and a resolution, and nothing else. Listing the programs on
+        # each screen was meant to help you recognise it and did the opposite:
+        # the list churns as windows move, so the same display read differently
+        # from one look to the next. A resolution does not move.
+        entries = []
         for display in list_displays():
             index = display["index"]
             shown = (
@@ -385,14 +373,10 @@ class SetupApi(AppBridge):
                 if index < len(numbers) and numbers[index]
                 else index + 1
             )
-            label = f"Display {shown} ({display['width']}x{display['height']})"
-            running = on_display.get(display["index"], [])
-            if running:
-                shown = ", ".join(running[:3])
-                if len(running) > 3:
-                    shown += f" +{len(running) - 3}"
-                label += f" - {shown}"
-            entries.append({**display, "label": label, "running": running})
+            entries.append({
+                **display,
+                "label": f"Display {shown} ({display['width']}x{display['height']})",
+            })
 
         return {"displays": entries, "current": self.current()["display"]}
 
@@ -429,8 +413,6 @@ class SetupApi(AppBridge):
         and the packaged app is built without a console, so the one string
         needed to add a second machine was written where nobody could read it.
         """
-        from capture.audio import find_loopback_device
-        from capture.config import get_capture_settings
         from paths import data_dir
         from server.config import get_settings
 
@@ -439,11 +421,14 @@ class SetupApi(AppBridge):
         now = self.current()
         hosting = _is_local(now["url"])
 
-        # Windows ships no desktop-audio capture device, so a clip is silent
-        # until one exists. Reported here because the alternative way to find
-        # out is to record something worth keeping and play it back.
+        # Whatever Windows is playing to right now, which is what gets
+        # recorded. Reported here because the alternative way to find out is to
+        # record something worth keeping and play it back.
         try:
-            audio = find_loopback_device(get_capture_settings().audio_device) or ""
+            import pyaudiowpatch as pyaudio
+
+            with pyaudio.PyAudio() as sound:
+                audio = str(sound.get_default_wasapi_loopback()["name"])
         except Exception as exc:  # noqa: BLE001
             warn("audio device", exc, "settings cannot say whether clips have sound")
             audio = ""

@@ -122,20 +122,20 @@ class Tunnel:
 
 
 class Tunnels:
-    """Public addresses for the API and for the clips themselves.
+    """A public address for this install.
 
-    Two, not one. The API serves pages on 8000 but clips come straight from
-    storage on 9000, so exposing only the API produces share pages whose video
-    URLs still point at 127.0.0.1 and play for nobody.
+    One, not two. Clips used to come from a storage server on its own port, so
+    exposing only the API produced share pages whose video URLs still pointed at
+    127.0.0.1 and played for nobody. That server is gone: the app serves the
+    pages and the files, and a second tunnel was one more thing that had to come
+    up before anyone could be given a link.
     """
 
-    def __init__(self, api_port: int = 8000, storage_port: int = 9000):
+    def __init__(self, api_port: int = 8000):
         self.api_port = api_port
-        self.storage_port = storage_port
         self.api: Tunnel | None = None
-        self.storage: Tunnel | None = None
 
-    def start(self) -> tuple[str, str] | None:
+    def start(self) -> str | None:
         binary = cloudflared()
         if not binary:
             print("  cloudflared not found. Install it:")
@@ -143,29 +143,21 @@ class Tunnels:
             return None
 
         self.api = Tunnel(binary, self.api_port)
-        self.storage = Tunnel(binary, self.storage_port)
-        api_url, storage_url = self.api.wait(), self.storage.wait()
-        if not api_url or not storage_url:
-            print("  A tunnel did not come up.")
+        api_url = self.api.wait()
+        if not api_url:
+            print("  The tunnel did not come up.")
             self.stop()
             return None
 
-        if not (self.api.resolvable() and self.storage.resolvable()):
-            print("  Tunnels opened but their addresses do not resolve yet.")
+        if not self.api.resolvable():
+            print("  The tunnel opened but its address does not resolve yet.")
             self.stop()
             return None
 
-        update_config(
-            PUBLIC_BASE_URL=api_url,
-            S3_PUBLIC_BASE_URL=f"{storage_url}/clips",
-            # Uploads are signed for this host, so a client elsewhere has to be
-            # given an address it can actually reach.
-            S3_PUBLIC_ENDPOINT_URL=storage_url,
-        )
-        return api_url, storage_url
+        update_config(PUBLIC_BASE_URL=api_url)
+        return api_url
 
     def stop(self) -> None:
-        for tunnel in (self.api, self.storage):
-            if tunnel is not None:
-                tunnel.stop()
+        if self.api is not None:
+            self.api.stop()
         self.api = self.storage = None

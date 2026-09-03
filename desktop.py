@@ -572,14 +572,14 @@ def main() -> int:
 
             update_config(INVITE_CODE=generate_key().replace("arete_", "join_")[:20])
 
-        # Tunnels before the API, because they rewrite the public addresses the
+        # The tunnel before the API, because it rewrites the public address the
         # API bakes into every share page and upload URL when it imports.
         if host_flag("MANAGE_TUNNEL", True):
-            print("Opening tunnels...")
+            print("Opening a tunnel...")
             tunnels = Tunnels(api_port=PORT)
-            addresses = tunnels.start()
-            if addresses:
-                print(f"  public address: {addresses[0]}")
+            address = tunnels.start()
+            if address:
+                print(f"  public address: {address}")
             else:
                 print("  no tunnel; links will only work on this machine")
 

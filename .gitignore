@@ -48,3 +48,7 @@ storage/
 # agent instructions: local to whoever is working on this, not part of the app
 CLAUDE.md
 .claude/
+
+# the embedded browser profile: cache and cookies, created beside the app
+# when running from source
+webview/

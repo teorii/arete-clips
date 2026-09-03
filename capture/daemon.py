@@ -23,6 +23,7 @@ from problems import warn
 from . import sound
 from .cutter import ClipError, flush
 from .config import get_capture_settings
+from .loopback import Loopback
 from .ffmpeg import FFMPEG
 from .ringbuffer import RingBuffer
 from .uploader import UploadError, Uploader
@@ -78,34 +79,49 @@ class Daemon:
     def __init__(self) -> None:
         self.s = get_capture_settings()
         self.ring = RingBuffer(self.s)
+        # Its own recording of the default playback device. ffmpeg's dshow
+        # input cannot see one, so this is the only way to capture what the
+        # machine is actually playing rather than a named capture device.
+        self.audio = Loopback()
         self.uploader = Uploader(
             self.s.api_base_url, JOURNAL, api_key=self.s.arete_api_key
         )
         self.gpu = gpu_name()
         self._busy = threading.Lock()
 
-    def program_name(self) -> str | None:
-        """What was on the captured display, for naming the clip.
+    def clip_name(self, when: datetime) -> str:
+        """What to call a clip nobody has renamed yet.
 
-        A library of timestamps tells you nothing. Naming the clip after the
-        game is the difference between scanning thumbnails and reading a list.
+        The screen and the time, because both are true. Naming a clip after the
+        program in front on the captured display sounded better and read worse:
+        the answer was whatever happened to hold focus at the moment the hotkey
+        arrived, which on a second monitor is rarely the game and sometimes the
+        overlay that was clicked to start recording.
+
+        The display is numbered as Windows numbers it, so it matches the source
+        shown in the app rather than the index ddagrab counts from.
         """
+        shown = self.s.ddagrab_output_idx + 1
         try:
-            from .windows import program_on_display
+            from .windows import monitors
 
-            return program_on_display(self.s.ddagrab_output_idx)
+            found = monitors()
+            index = self.s.ddagrab_output_idx
+            if index < len(found) and found[index].get("number"):
+                shown = found[index]["number"]
         except Exception as exc:  # noqa: BLE001
-            # Never worth failing a clip over: an unnamed clip is fine, a lost
-            # one is not.
-            warn("program name", exc, "this clip will be untitled")
-            return None
+            # Never worth failing a clip over: a clip named by index is fine, a
+            # lost one is not.
+            warn("clip name", exc, "this clip is named by capture order")
+
+        return f"Display {shown} at {when.astimezone().strftime('%H.%M')}"
 
     def capture_meta(self, width: int, height: int) -> dict:
         return {
             "encoder": "h264_nvenc",
             "gpu": self.gpu,
             "capture_api": "ddagrab (Desktop Duplication)",
-            "audio": self.ring.audio_device or "none",
+            "audio": self.audio.device or self.ring.audio_device or "none",
             "width": width,
             "height": height,
             "fps": self.s.capture_fps,
@@ -140,9 +156,7 @@ class Daemon:
 
             sound.clip_saved()
             meta = self.capture_meta(result.width, result.height)
-            title = self.program_name()
-            if title:
-                meta["program"] = title
+            title = self.clip_name(captured_at)
 
             if not self.s.auto_upload:
                 path = self.uploader.hold(result, captured_at, meta, title=title)
@@ -171,6 +185,12 @@ class Daemon:
         return {"status": "failed", "path": None, "url": None}
 
     def start_buffer(self) -> None:
+        # Opened before the encoder, which has to be told the sample rate and
+        # channel count before it starts, and only the device knows them. A
+        # device that will not open costs the sound, never the picture.
+        self.audio.open()
+        self.ring.loopback = self.audio
+
         print(f"Starting ring buffer: {self.s.buffer_seconds}s window, "
               f"{self.s.segment_seconds}s segments, output_idx={self.s.ddagrab_output_idx}")
         self.ring.start()
@@ -179,15 +199,11 @@ class Daemon:
             raise SystemExit(
                 f"capture process exited immediately.\n{self.ring.tail_log()}"
             )
-        audio = self.ring.audio_device
         print(f"Capturing on {self.gpu} via h264_nvenc")
-        if audio:
-            print(f"Desktop audio: {audio}")
+        if self.audio.device:
+            print(f"Desktop audio: {self.audio.device}")
         else:
-            print(
-                "Desktop audio: none found, clips will be silent. "
-                "Install a loopback capture device, or set AUDIO_DEVICE."
-            )
+            print("Desktop audio: unavailable, clips will be silent.")
 
     def drain_journal(self) -> None:
         swept = self.uploader.sweep_staging(CLIP_OUT_DIR)
@@ -239,6 +255,7 @@ def main() -> None:
         print("\nStopping.")
     finally:
         daemon.ring.stop()
+        daemon.audio.close()
 
 
 if __name__ == "__main__":

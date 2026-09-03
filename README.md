@@ -36,6 +36,13 @@ The cut is a byte copy. Every buffer segment is forced to open on an IDR frame,
 so trimming to a segment boundary means concatenating compressed data with
 `-c copy`: no decode, no re-encode.
 
+Sound comes from whatever Windows is playing to, and follows the default device
+if you change it. ffmpeg cannot open a WASAPI device, so the samples are read in
+Python and handed to the encoder on its stdin: one process timestamps the
+picture and the sound, which is what keeps them together. Recording them
+separately and muxing afterwards meant two clocks and a guess at the distance
+between them, and the guess played every clip's sound early.
+
 ## Measured
 
 One run on an RTX 3070, capturing a 2560x1440 display at 60 fps, 12 Mbps:
@@ -194,13 +201,8 @@ to lane stop existing.
 
 ## What is deliberately not built yet
 
-- **Audio needs a loopback device.** Windows ships none, so `ddagrab` alone
-  records silent video. Install
-  [screen-capture-recorder](https://github.com/rdp/screen-capture-recorder-to-video-windows-free/releases)
-  and its `virtual-audio-capturer` device is picked up automatically, no
-  configuration. `AUDIO_DEVICE` in `.env` overrides the search: `none` forces
-  silent video, or name an exact dshow device. Mic and voice chat on separate
-  tracks are still unbuilt.
+- **Microphone and voice chat on separate tracks.** Desktop sound is recorded,
+  and only desktop sound: what the game played, not what the room heard.
 - **Byte-range resumable upload.** Retry is per-clip via the journal, so a crash
   or reboot does not lose a clip, but a 90%-complete upload restarts. The API is
   already shaped around upload targets so multipart drops in.

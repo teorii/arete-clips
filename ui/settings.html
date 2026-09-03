@@ -46,6 +46,20 @@
     </select>
     <div class="hint">A longer clip at higher quality is more to upload before
       the link exists.</div>
+
+    <label for="audioOffsetMs">Audio timing</label>
+    <select id="audioOffsetMs">
+      <option value="-300">Sound 300 ms earlier</option>
+      <option value="-200">Sound 200 ms earlier</option>
+      <option value="-100">Sound 100 ms earlier</option>
+      <option value="0">Matched</option>
+      <option value="100">Sound 100 ms later</option>
+      <option value="200">Sound 200 ms later</option>
+      <option value="300">Sound 300 ms later</option>
+    </select>
+    <div class="hint">Sound is lined up against the picture already. This is
+      for the remainder your hardware adds: pick later if sound arrives before
+      what caused it.</div>
   </section>
 
   <section>
@@ -84,7 +98,7 @@
 
 <script>
   const $ = (id) => document.getElementById(id);
-  const CONFIG = ['display', 'seconds', 'hotkey', 'bitrate'];
+  const CONFIG = ['display', 'seconds', 'hotkey', 'bitrate', 'audioOffsetMs'];
   const CHECKS = ['play_sound', 'show_notifications', 'quit_on_close',
                   'copy_link_automatically', 'confirm_delete'];
 
@@ -123,13 +137,13 @@
     // Windows ships no desktop-audio capture device, so silence is the
     // default and worth stating plainly rather than discovering on playback.
     const audio = install.audio
-      ? '<div class="check"><b>Audio</b> <span>Recording desktop sound from ' +
+      ? '<div class="check"><b>Audio</b> <span>Recording what plays through ' +
         '<code>' + install.audio + '</code></span></div>'
       : '<div class="check"><b>Audio</b> <span class="bad">Clips will be ' +
         'silent.</span></div>' +
-        '<div class="hint">Windows ships no desktop-audio capture device. Enable ' +
-        'Stereo Mix under Sound settings, Recording devices, then restart Arete. ' +
-        'Microphones are never used: only a device that captures what you hear.</div>';
+        '<div class="hint">Arete records whatever Windows is playing to, and ' +
+        'follows the default device if you change it. Microphones are never ' +
+        'used.</div>';
 
     let html =
       '<div class="check"><b>Clips</b> <span>' + where + '</span></div>' +
@@ -174,6 +188,7 @@
     $('seconds').value = String(current.seconds);
     $('hotkey').value = current.hotkey;
     $('bitrate').value = current.bitrate;
+    $('audioOffsetMs').value = String(current.audioOffsetMs ?? 0);
 
     for (const id of CHECKS) $(id).checked = prefs[id] === true;
     $('held_warning_gb').value = String(
@@ -214,6 +229,7 @@
         seconds: parseInt($('seconds').value, 10),
         hotkey: $('hotkey').value,
         bitrate: $('bitrate').value,
+        audioOffsetMs: parseInt($('audioOffsetMs').value, 10),
       });
     } catch (err) {
       result = { ok: false, message: String(err) };

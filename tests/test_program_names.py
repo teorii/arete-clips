@@ -50,3 +50,38 @@ def test_a_hosting_install_counts_as_configured(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     assert paths.is_configured() is True, "a hosting install must count as configured"
+
+
+def test_a_clip_is_named_for_the_screen_and_the_time(monkeypatch):
+    """Naming a clip after the program in front sounded better and read worse:
+    the answer was whatever held focus when the hotkey arrived, which on a
+    second monitor is rarely the game."""
+    from datetime import datetime, timezone
+
+    from capture.daemon import Daemon
+
+    monkeypatch.setattr("capture.windows.monitors",
+                        lambda: [{"number": 2}, {"number": 3}, {"number": 1}])
+
+    daemon = Daemon.__new__(Daemon)
+    daemon.s = type("S", (), {"ddagrab_output_idx": 1})()
+
+    when = datetime(2026, 9, 3, 21, 5, tzinfo=timezone.utc)
+    name = daemon.clip_name(when)
+
+    # Numbered as Windows numbers it, so it matches the source shown in the app.
+    assert name.startswith("Display 3 at ")
+    assert len(name.split(" at ")[1]) == 5
+
+
+def test_a_display_windows_cannot_name_falls_back_to_capture_order(monkeypatch):
+    from datetime import datetime, timezone
+
+    from capture.daemon import Daemon
+
+    monkeypatch.setattr("capture.windows.monitors", lambda: [])
+
+    daemon = Daemon.__new__(Daemon)
+    daemon.s = type("S", (), {"ddagrab_output_idx": 0})()
+
+    assert daemon.clip_name(datetime.now(timezone.utc)).startswith("Display 1 at ")

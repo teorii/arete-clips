@@ -28,6 +28,11 @@ class CaptureSettings(BaseSettings):
     # else is an exact dshow device name.
     audio_device: str = "auto"
 
+    # ffmpeg timestamps the picture and the sound on one clock, so this starts
+    # at nothing. It is here for hardware that still needs a nudge: positive
+    # moves the sound later, which is the fix when it arrives early.
+    audio_offset_ms: int = 0
+
     # Off by default: capturing and publishing are separate decisions. The
     # hotkey keeps the moment, and a link is asked for afterwards.
     auto_upload: bool = False

@@ -93,11 +93,6 @@ def test_sources_are_labelled_for_the_pages_that_show_them(monkeypatch):
         lambda: [{"index": 0, "width": 1920, "height": 1080},
                  {"index": 1, "width": 2560, "height": 1440}],
     )
-    monkeypatch.setattr(
-        "capture.windows.visible_windows",
-        lambda: [{"process": "League.exe", "display_index": 1,
-                  "title": "League", "width": 2560, "height": 1440}],
-    )
     # ddagrab's index is not Windows' display number, and labelling by index
     # named a different screen than Display Settings does.
     monkeypatch.setattr(
@@ -108,11 +103,11 @@ def test_sources_are_labelled_for_the_pages_that_show_them(monkeypatch):
     api = setup_module.SetupApi(on_saved=lambda: None, on_skipped=lambda: None)
     found = api.sources()
 
-    # One entry per display, named by what is on it: a program list alongside
-    # implied capture could select a window, and it cannot.
+    # A number and a resolution. Programs were listed here once, which implied
+    # capture could select a window, and churned as windows moved.
     assert "programs" not in found
     assert found["displays"][0]["label"] == "Display 2 (1920x1080)"
-    assert found["displays"][1]["label"] == "Display 3 (2560x1440) - League"
+    assert found["displays"][1]["label"] == "Display 3 (2560x1440)"
     for entry in found["displays"]:
         assert entry["label"].strip(), "an unlabelled entry renders as a blank row"
 
