@@ -24,8 +24,12 @@ from collections.abc import Callable
 from ctypes import wintypes
 from pathlib import Path
 
+from paths import data_dir
+
 ROOT = Path(__file__).resolve().parent
-LOG_PATH = ROOT / "arete.log"
+# Beside the config, not the executable: a one-file build unpacks to a temp
+# directory that is deleted on exit, taking the log with it.
+LOG_PATH = data_dir() / "arete.log"
 
 # Launched via pythonw.exe there is no console, so sys.stdout is None and any
 # print() anywhere in the process raises. Redirect before importing anything
@@ -44,6 +48,8 @@ import webview  # noqa: E402
 from branding import APP_ID, APP_NAME  # noqa: E402
 from capture.daemon import Daemon  # noqa: E402
 from capture.hotkey import pump  # noqa: E402
+from paths import bundle_dir, config_file, is_configured  # noqa: E402
+from setup import SetupApi, setup_page  # noqa: E402
 from tray import Tray  # noqa: E402
 
 # Loopback by default. Setting BIND_HOST=0.0.0.0 makes share links work for
@@ -56,35 +62,45 @@ PORT = int(os.environ.get("PORT", "8000"))
 # Where the window points. Distinct from HOST, because 0.0.0.0 is a bind
 # address and not somewhere anything can navigate to.
 UI_HOST = "127.0.0.1" if HOST in {"0.0.0.0", "::"} else HOST
-DIST = ROOT / "frontend" / "dist"
+DIST = bundle_dir() / "frontend" / "dist"
+ICON_PATH = bundle_dir() / "assets" / "arete.ico"
 
 
-def _capture_config():
-    from capture.config import get_capture_settings
+def capture_config():
+    """Read settings fresh.
 
+    Deliberately not cached at import: setup writes the config file while the
+    process is already running, and everything downstream has to see it.
+    """
+    from capture.config import CaptureSettings, get_capture_settings
+
+    get_capture_settings.cache_clear()
+    CaptureSettings.model_config["env_file"] = str(config_file())
     return get_capture_settings()
 
 
-_CAPTURE = _capture_config()
-API_BASE = _CAPTURE.api_base_url.rstrip("/")
+def api_base() -> str:
+    return capture_config().api_base_url.rstrip("/")
 
-# Whether this machine hosts the API or just talks to one.
-#
-# A second person running this points API_BASE_URL at the host and should not
-# start a server of their own: their clips belong in the shared database, not a
-# private copy of it. Deriving the mode from where the API lives keeps that from
-# being a flag someone forgets to set.
-IS_HOST = urlparse(API_BASE).hostname in {"localhost", "127.0.0.1", "::1", None}
 
-# The key rides in the fragment, which is never sent to the server, so it stays
-# out of access logs while still reaching the page before its first request.
-_KEY_FRAGMENT = f"#k={quote(_CAPTURE.arete_api_key)}" if _CAPTURE.arete_api_key else ""
-APP_URL = (
-    f"http://{UI_HOST}:{PORT}/app/{_KEY_FRAGMENT}"
-    if IS_HOST
-    else f"{API_BASE}/app/{_KEY_FRAGMENT}"
-)
-ICON_PATH = ROOT / "assets" / "arete.ico"
+def is_host() -> bool:
+    """Whether this machine runs the API, or only talks to one.
+
+    A second person points API_BASE_URL at the host and should not start a
+    server of their own: their clips belong in the shared database. Deriving
+    the mode from where the API lives keeps it from being a flag to forget.
+    """
+    return urlparse(api_base()).hostname in {"localhost", "127.0.0.1", "::1", None}
+
+
+def app_url() -> str:
+    # The key rides in the fragment, which is never sent to the server, so it
+    # stays out of access logs while still reaching the page before its first
+    # request.
+    key = capture_config().arete_api_key
+    fragment = f"#k={quote(key)}" if key else ""
+    base = f"http://{UI_HOST}:{PORT}" if is_host() else api_base()
+    return f"{base}/app/{fragment}"
 
 
 def claim_taskbar_identity() -> None:
@@ -324,6 +340,44 @@ class CaptureService:
             self.daemon.ring.stop()
 
 
+def preflight() -> bool:
+    """Check the services the app depends on before opening a window.
+
+    Self-hosting means Postgres and the object store are separate processes that
+    can simply be off. Finding that out from an empty library and a stack trace
+    in a log file is worse than being told which one is not running.
+    """
+    from sqlalchemy import text as sql_text
+
+    from server.config import get_settings
+    from server.db import engine
+    from server.storage import get_storage
+
+    settings = get_settings()
+    ok = True
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(sql_text("select 1"))
+    except Exception as exc:  # noqa: BLE001
+        target = settings.database_url.split("@")[-1]
+        print(f"Database unreachable ({target}): {type(exc).__name__}")
+        if "postgresql" in settings.database_url:
+            print("  Start it with:  net start postgresql-x64-18   (needs admin)")
+        ok = False
+
+    if settings.storage_backend in {"s3", "r2"}:
+        try:
+            get_storage().size_of("preflight-probe-that-does-not-exist")
+        except Exception as exc:  # noqa: BLE001
+            print(f"Object storage unreachable ({settings.s3_endpoint_url}): "
+                  f"{type(exc).__name__}")
+            print(r"  Start it with:  scripts\start-storage.bat")
+            ok = False
+
+    return ok
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog=APP_NAME.lower())
     parser.add_argument(
@@ -339,43 +393,72 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    # Packaged, these are the answers to most "where did it put that" and
+    # "why is it not reading my settings" questions, and they cost one line.
+    print(f"{APP_NAME} starting")
+    print(f"  config : {config_file()}")
+    print(f"  data   : {LOG_PATH.parent}")
+    print(f"  buffer : {capture_config().ring_buffer_dir}")
+
     # Before any window exists, or the taskbar button is already Python's.
     claim_taskbar_identity()
 
     api: ApiServer | None = None
+    configured = is_configured()
 
-    if IS_HOST:
+    def start_backend() -> bool:
+        """Bring up whatever this machine is responsible for.
+
+        Called before the window when already configured, and again from the
+        setup screen once settings exist, because until then there is nothing
+        to connect to and no way to know which mode this machine is in.
+        """
+        nonlocal api
+        if is_host() and not preflight():
+            return False
+        if is_host():
+            return start_host()
+        return check_client()
+
+    def start_host() -> bool:
+        nonlocal api
         if not DIST.is_dir():
             print("frontend/dist is missing. Build it:  cd frontend && npm run build")
-            return 1
+            return False
         if port_is_taken(UI_HOST, PORT):
             print(
                 f"Port {PORT} is already in use. Another {APP_NAME} or a uvicorn "
                 "started from a terminal is probably still running."
             )
-            return 1
+            return False
         api = ApiServer(verbose=args.verbose)
         api.start()
         if not wait_for_health():
             print(f"The API did not come up on port {PORT}. See {LOG_PATH}.")
-            return 1
-    else:
+            return False
+        return True
+
+    def check_client() -> bool:
         # Client mode: someone else hosts the API and the database, so this
         # machine starts no server of its own. Both checks fail loudly here
         # rather than opening a window onto an unreachable host, where the
         # symptom would be an empty library with no explanation.
-        print(f"Using the API at {API_BASE}")
-        if not _CAPTURE.arete_api_key:
+        print(f"Using the API at {api_base()}")
+        if not capture_config().arete_api_key:
             print(
                 "No ARETE_API_KEY set. Ask whoever runs the host "
                 "to issue one: python -m tools.add_user --handle <name>"
             )
-            return 1
+            return False
         try:
-            httpx.get(f"{API_BASE}/healthz", timeout=8.0).raise_for_status()
+            httpx.get(f"{api_base()}/healthz", timeout=8.0).raise_for_status()
         except httpx.HTTPError as exc:
-            print(f"Cannot reach {API_BASE}: {exc}")
-            return 1
+            print(f"Cannot reach {api_base()}: {exc}")
+            return False
+        return True
+
+    if configured and not start_backend():
+        return 1
 
     tray: Tray | None = None
     # Set once the tray Quit item runs, so the closing handler stops hiding the
@@ -398,19 +481,47 @@ def main() -> int:
         tray.notify(message)
 
     capture = CaptureService(on_clip=on_clip_done, on_health=on_health)
-    if not args.no_capture:
+    if configured and not args.no_capture:
         capture.start()
 
-    window = webview.create_window(
-        APP_NAME,
-        APP_URL,
-        width=1280,
-        height=820,
-        min_size=(880, 560),
-        background_color="#0b0e14",
-    )
+    if configured:
+        window = webview.create_window(
+            APP_NAME,
+            app_url(),
+            width=1280,
+            height=820,
+            min_size=(880, 560),
+            background_color="#0b0e14",
+        )
+    else:
+        # Nothing is configured yet, so there is no server to point a window at
+        # and nothing to record. Setup runs in this same window and navigates
+        # to the app when it is done: pywebview runs one GUI loop per process,
+        # so a second window is not an option.
+        def finish_setup() -> None:
+            if not start_backend():
+                print("Settings saved, but the service did not start.")
+                return
+            if not args.no_capture:
+                capture.start()
+            window.resize(1280, 820)
+            window.load_url(app_url())
 
-    if not args.no_tray:
+        def abandon_setup() -> None:
+            quitting.set()
+            window.destroy()
+
+        setup_api = SetupApi(on_saved=finish_setup, on_skipped=abandon_setup)
+        window = webview.create_window(
+            f"{APP_NAME} setup",
+            setup_page(),
+            js_api=setup_api,
+            width=760,
+            height=760,
+            background_color="#0b0e14",
+        )
+
+    if not args.no_tray and configured:
 
         def show_window() -> None:
             window.show()

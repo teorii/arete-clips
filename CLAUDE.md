@@ -43,6 +43,19 @@ recording; `--no-tray` makes closing the window quit. The pieces below still run
 
 Requires ffmpeg on PATH (or installed via winget) and an NVENC-capable GPU.
 
+## Where things run
+
+Self-hosted, no SaaS. Postgres on 5432 (`arete`), MinIO on 9000 (bucket
+`clips`), app on 8000. `desktop.py` preflights both and names whichever is
+down. `scripts\start-storage.bat` starts MinIO; Postgres is a Windows service.
+
+`server/models.py` is the schema source of truth and `server/migrate.py` builds
+it. `sql/001_init.sql` is a reference that records reasoning, not something that
+runs; if they disagree, the models are right.
+
+The storage backend is S3-shaped on purpose: MinIO locally and R2 or S3 on a
+server are the same code, which is what keeps this deployable off this desktop.
+
 ## Identity
 
 Every client carries an API key (`X-API-Key`), issued by `tools/add_user.py`.

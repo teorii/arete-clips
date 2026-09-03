@@ -57,6 +57,7 @@ def list_audio_devices() -> list[str]:
         [FFMPEG, "-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"],
         capture_output=True,
         text=True,
+        stdin=subprocess.DEVNULL,
         creationflags=_NO_WINDOW,
     )
     # ffmpeg always exits non-zero for a device listing, since "dummy" is not a

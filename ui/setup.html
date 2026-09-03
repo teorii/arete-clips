@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Arete setup</title>
+<style>
+  :root {
+    --bg:#0b0e14; --panel:#141922; --panel2:#1a2130; --line:#232b39;
+    --text:#e6edf3; --dim:#8b97a8; --accent:#4f9cf9; --ok:#4ade80; --bad:#f8607a;
+    color-scheme: dark;
+  }
+  * { box-sizing:border-box }
+  body {
+    margin:0; background:var(--bg); color:var(--text); padding:26px 30px 30px;
+    font:14px/1.55 ui-sans-serif, system-ui, 'Segoe UI', Roboto, sans-serif;
+  }
+  h1 { font-size:19px; margin:0 0 3px }
+  .sub { color:var(--dim); font-size:13px; margin-bottom:22px }
+  section { border:1px solid var(--line); background:var(--panel); border-radius:10px; padding:15px 17px; margin-bottom:13px }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:.07em; color:var(--dim); margin:0 0 11px; font-weight:600 }
+  label { display:block; font-size:12px; color:var(--dim); margin:9px 0 4px }
+  input, select {
+    width:100%; background:var(--panel2); border:1px solid var(--line); border-radius:7px;
+    padding:9px 11px; color:var(--text); font-size:13px;
+  }
+  input:focus, select:focus { outline:none; border-color:var(--accent) }
+  .row { display:flex; gap:9px; align-items:center; margin-top:11px }
+  button {
+    background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    border-radius:7px; padding:9px 15px; font-size:13px; cursor:pointer; font-family:inherit;
+  }
+  button:hover:not(:disabled) { border-color:var(--accent) }
+  button.primary { background:var(--accent); border:0; color:#04101f; font-weight:600 }
+  button:disabled { opacity:.5; cursor:default }
+  .status { font-size:13px; margin-left:2px }
+  .ok { color:var(--ok) } .bad { color:var(--bad) } .dim { color:var(--dim) }
+  .check { display:flex; gap:9px; align-items:baseline; padding:4px 0; font-size:13px }
+  .check b { font-weight:600 }
+  code { background:var(--panel2); padding:1px 5px; border-radius:4px; font-size:12px }
+  .foot { display:flex; align-items:center; gap:11px; margin-top:17px }
+  .foot .status { margin-left:auto }
+</style>
+</head>
+<body>
+  <h1>Set up Arete</h1>
+  <div class="sub">Press a key in game, get a link. This takes a minute.</div>
+
+  <section>
+    <h2>1. This machine</h2>
+    <div id="hardware" class="dim">Checking…</div>
+  </section>
+
+  <section>
+    <h2>2. Where your clips go</h2>
+    <label for="url">Server address</label>
+    <input id="url" placeholder="https://clips.example.com" autocomplete="off" spellcheck="false">
+    <label for="key">Your key</label>
+    <input id="key" placeholder="arete_…" autocomplete="off" spellcheck="false">
+    <div class="row">
+      <button id="test">Test connection</button>
+      <span id="conn" class="status dim">Not tested yet.</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>3. What to record</h2>
+    <label for="display">Display</label>
+    <select id="display"><option>Checking…</option></select>
+    <label for="seconds">Clip length</label>
+    <select id="seconds">
+      <option value="15">15 seconds</option>
+      <option value="30" selected>30 seconds</option>
+      <option value="60">60 seconds</option>
+    </select>
+  </section>
+
+  <div class="foot">
+    <button id="save" class="primary" disabled>Save and start</button>
+    <button id="skip">Skip for now</button>
+    <span id="saveStatus" class="status dim"></span>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let encoderOk = false, connectionOk = false;
+
+  function refreshSave() {
+    $('save').disabled = !(encoderOk && connectionOk);
+  }
+
+  async function ready() {
+    // pywebview injects its bridge asynchronously.
+    while (!window.pywebview || !window.pywebview.api) {
+      await new Promise(r => setTimeout(r, 60));
+    }
+  }
+
+  async function probe() {
+    let info;
+    try {
+      info = await window.pywebview.api.probe();
+    } catch (err) {
+      // Without this a failure on the Python side leaves the promise rejected
+      // and the page sitting on "Checking..." forever, which reads as a hang.
+      $('hardware').innerHTML =
+        `<div class="check bad">Could not check this machine: ${err}</div>`;
+      $('display').innerHTML = '<option>Unavailable</option>';
+      return;
+    }
+    encoderOk = info.encoder_ok;
+    $('hardware').innerHTML = [
+      `<div class="check"><b>${info.encoder_ok ? '✓' : '✕'}</b>
+        <span class="${info.encoder_ok ? 'ok' : 'bad'}">
+        ${info.encoder_ok
+          ? 'Hardware encoder ready' + (info.gpu ? ' — ' + info.gpu : '')
+          : 'No usable NVIDIA encoder on this PC'}</span></div>`,
+      `<div class="check"><b>${info.displays.length ? '✓' : '✕'}</b>
+        <span class="${info.displays.length ? 'ok' : 'bad'}">
+        ${info.displays.length} display${info.displays.length === 1 ? '' : 's'} found</span></div>`,
+      info.encoder_ok ? '' :
+        `<div class="check dim">Arete records through an NVIDIA GPU. Without one it
+         cannot capture, and the rest of setup will not help.</div>`,
+    ].join('');
+
+    const select = $('display');
+    select.innerHTML = '';
+    for (const d of info.displays) {
+      const option = document.createElement('option');
+      option.value = d.index;
+      option.textContent = `Display ${d.index + 1} — ${d.width}×${d.height}`;
+      select.appendChild(option);
+    }
+    if (info.displays.length > 1) select.value = info.displays[1].index;
+    refreshSave();
+  }
+
+  $('test').onclick = async () => {
+    $('test').disabled = true;
+    $('conn').className = 'status dim';
+    $('conn').textContent = 'Checking…';
+    let result;
+    try {
+      result = await window.pywebview.api.test($('url').value, $('key').value);
+    } catch (err) {
+      result = { ok: false, message: String(err) };
+    }
+    connectionOk = result.ok;
+    $('conn').className = 'status ' + (result.ok ? 'ok' : 'bad');
+    $('conn').textContent = result.message;
+    if (result.base_url) $('url').value = result.base_url;
+    $('test').disabled = false;
+    refreshSave();
+  };
+
+  $('save').onclick = async () => {
+    $('save').disabled = true;
+    $('saveStatus').className = 'status dim';
+    $('saveStatus').textContent = 'Saving…';
+    let result;
+    try {
+      result = await window.pywebview.api.save({
+        url: $('url').value,
+        key: $('key').value,
+        display: parseInt($('display').value, 10),
+        seconds: parseInt($('seconds').value, 10),
+      });
+    } catch (err) {
+      result = { ok: false, message: String(err) };
+    }
+    if (!result.ok) {
+      $('saveStatus').className = 'status bad';
+      $('saveStatus').textContent = result.message;
+      $('save').disabled = false;
+    }
+  };
+
+  $('skip').onclick = () => window.pywebview.api.skip();
+
+  ready().then(probe);
+</script>
+</body>
+</html>

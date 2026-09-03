@@ -37,11 +37,14 @@ class ClipError(RuntimeError):
 
 
 def _run(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
+    # Explicit stdin: a windowed build has no console, and a child left to
+    # inherit an invalid handle hangs instead of failing.
     return subprocess.run(
         args,
         cwd=str(cwd) if cwd else None,
         capture_output=True,
         text=True,
+        stdin=subprocess.DEVNULL,
         creationflags=_NO_WINDOW,
     )
 

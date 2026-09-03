@@ -1,9 +1,13 @@
--- Canonical Postgres schema (Supabase or any Postgres 14+).
+-- Postgres schema, as a reference.
 --
--- The SQLAlchemy models in server/models.py mirror this and are what
--- create_all() builds on SQLite for zero-setup local runs. Run this file when
--- you point DATABASE_URL at real Postgres, so you get native enums, partial
--- indexes and jsonb rather than the SQLite-compatible approximations.
+-- NOT the source of truth: server/models.py is, and server/migrate.py builds
+-- the real schema with create_all() plus forward column additions. That is what
+-- runs, what the tests exercise, and what works on both SQLite and Postgres.
+--
+-- This file is kept because it records the reasoning the models cannot: why
+-- there are two timestamps, why renditions are a separate table, and why
+-- partitioning is deliberately not enabled. Read it for that. If it disagrees
+-- with models.py, models.py is right.
 
 create extension if not exists pgcrypto;
 
@@ -18,9 +22,12 @@ exception when duplicate_object then null; end $$;
 create table if not exists users (
   id            uuid primary key,
   handle        text unique not null,
-  tier          text not null default 'free',
-  quota_bytes   bigint not null default 5368709120,  -- 5 GiB
-  created_at    timestamptz not null default now()
+  -- SHA-256 of the API key. The key itself is shown once and never stored, so
+  -- a copy of this database hands over nothing usable.
+  api_key_hash  char(64) unique not null,
+  created_at    timestamptz not null default now(),
+  -- Set to revoke access without touching the clips that person owns.
+  disabled_at   timestamptz
 );
 
 create table if not exists games (
@@ -62,6 +69,12 @@ create table if not exists clips (
   capture_meta  jsonb,
 
   storage_tier  storage_tier not null default 'hot',
+  -- Pinned by the owner.
+  favorite      boolean not null default false,
+  -- Bumped whenever the bytes behind a rendition change. Appended to playback
+  -- URLs, because trimming rewrites a file in place and every cache in the
+  -- chain would otherwise keep serving the old one from an unchanged URL.
+  version       integer not null default 1,
   -- Denormalized from the event stream. A row per view in this table would
   -- turn a viral clip into a write storm.
   view_count    bigint not null default 0,

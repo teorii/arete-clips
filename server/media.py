@@ -30,7 +30,13 @@ class MediaError(RuntimeError):
 
 
 def _run(args: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(args, capture_output=True, text=True, creationflags=_NO_WINDOW)
+    return subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        stdin=subprocess.DEVNULL,
+        creationflags=_NO_WINDOW,
+    )
 
 
 def duration_seconds(path: Path) -> float:

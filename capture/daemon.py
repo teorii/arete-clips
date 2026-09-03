@@ -17,14 +17,16 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from paths import data_dir
+
 from .cutter import ClipError, flush
 from .config import get_capture_settings
 from .ffmpeg import FFMPEG
 from .ringbuffer import RingBuffer
 from .uploader import UploadError, Uploader
 
-CLIP_OUT_DIR = Path("./clips_out")
-JOURNAL = Path("./clips_out/.pending.json")
+CLIP_OUT_DIR = data_dir() / "clips_out"
+JOURNAL = CLIP_OUT_DIR / ".pending.json"
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
@@ -32,7 +34,8 @@ def gpu_name() -> str:
     try:
         result = subprocess.run(
             ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
-            capture_output=True, text=True, timeout=5, creationflags=_NO_WINDOW,
+            capture_output=True, text=True, timeout=5,
+            stdin=subprocess.DEVNULL, creationflags=_NO_WINDOW,
         )
         if result.returncode == 0:
             return result.stdout.strip().splitlines()[0]
@@ -57,7 +60,8 @@ def probe_outputs() -> None:
             [FFMPEG, "-hide_banner", "-loglevel", "error",
              "-f", "lavfi", "-i", f"ddagrab=output_idx={idx}:framerate=30",
              "-t", "0.5", "-f", "null", "-"],
-            capture_output=True, text=True, creationflags=_NO_WINDOW,
+            capture_output=True, text=True,
+            stdin=subprocess.DEVNULL, creationflags=_NO_WINDOW,
         )
         if result.returncode == 0:
             print(f"  output_idx={idx}  available")

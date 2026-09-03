@@ -4,15 +4,22 @@ from pathlib import Path
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from paths import config_file, data_dir
+
 
 class CaptureSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # Resolved rather than hardcoded: packaged, the config lives in AppData,
+    # because a one-file build unpacks to a temp directory that is wiped.
+    model_config = SettingsConfigDict(env_file=str(config_file()), extra="ignore")
 
     api_base_url: str = "http://localhost:8000"
     # Issued by tools/add_user.py. Identifies which library a clip belongs to.
     arete_api_key: str = ""
 
-    ring_buffer_dir: Path = Path("./ringbuf")
+    # Under the per-user data directory, not the working directory. Launched
+    # from a shortcut the working directory is wherever Windows felt like, and
+    # may not be writable at all.
+    ring_buffer_dir: Path = data_dir() / "ringbuf"
     clip_seconds: int = 30
     buffer_seconds: int = 60
     segment_seconds: int = 2

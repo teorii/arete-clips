@@ -11,6 +11,7 @@ import base64
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+import tempfile
 from pathlib import Path
 from uuid import UUID
 
@@ -389,41 +390,41 @@ def trim_clip(
         raise HTTPException(409, "clip has no playable source to trim")
 
     storage = get_storage()
-    if not isinstance(storage, LocalStorage):
-        # Reading the object back would mean downloading it, trimming, and
-        # re-uploading. Worth building when there is a reason to; saying so
-        # beats failing in a way that looks like a bug.
-        raise HTTPException(501, "trimming is only implemented for local storage")
-
-    source_path = storage.path_for(source.storage_key)
-    if not source_path.exists():
-        raise HTTPException(409, "source file is missing from storage")
-
     start_s = payload.start_ms / 1000
     end_s = min(payload.end_ms / 1000, clip.duration_ms / 1000)
-    trimmed = source_path.with_suffix(".trimmed.mp4")
-    try:
-        trim(source_path, trimmed, start_s, end_s)
-        actual = duration_seconds(trimmed)
-        # Replace only once the new file is known good, so a failed trim never
-        # destroys the clip it was editing.
-        trimmed.replace(source_path)
-    except (MediaError, OSError) as exc:
-        trimmed.unlink(missing_ok=True)
-        raise HTTPException(422, f"could not trim: {exc}") from exc
+
+    # Works for a folder or a bucket: the bytes come back, get cut, and go out
+    # again under the same key. On a self-hosted setup the round trip is local.
+    with tempfile.TemporaryDirectory(prefix="trim_") as work:
+        working = Path(work)
+        original = working / "source.mp4"
+        cut = working / "cut.mp4"
+
+        if not storage.download(source.storage_key, original):
+            raise HTTPException(409, "source file is missing from storage")
+
+        try:
+            trim(original, cut, start_s, end_s)
+            actual = duration_seconds(cut)
+        except (MediaError, OSError) as exc:
+            # Nothing has been written back yet, so the clip is untouched.
+            raise HTTPException(422, f"could not trim: {exc}") from exc
+
+        source.bytes = storage.upload(source.storage_key, cut, "video/mp4")
+
+        thumb = db.get(ClipRendition, (clip_id, "thumb"))
+        if thumb is not None and thumb.storage_key:
+            poster_file = working / "poster.jpg"
+            if poster(cut, poster_file, actual / 2):
+                thumb.bytes = storage.upload(
+                    thumb.storage_key, poster_file, "image/jpeg"
+                )
+                thumb.status = RenditionStatus.ready
 
     clip.duration_ms = int(actual * 1000)
-    source.bytes = source_path.stat().st_size
     # The key is unchanged, so this is the only thing telling anything holding a
     # cached copy that the file behind it is different now.
     clip.version += 1
-
-    thumb = db.get(ClipRendition, (clip_id, "thumb"))
-    if thumb is not None and thumb.storage_key:
-        thumb_path = storage.path_for(thumb.storage_key)
-        if poster(source_path, thumb_path, actual / 2):
-            thumb.bytes = thumb_path.stat().st_size
-            thumb.status = RenditionStatus.ready
 
     db.commit()
     db.refresh(clip)

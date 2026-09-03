@@ -28,3 +28,10 @@ ringbuf/
 build/
 dist/
 *.spec
+
+# self-hosted MinIO data
+.minio-data/
+
+# packaged builds
+dist_app/
+build_app/

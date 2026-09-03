@@ -223,6 +223,55 @@ the same network, set `BIND_HOST=0.0.0.0` and point `PUBLIC_BASE_URL` at your
 LAN address. There is no auth, so anyone who can reach the port can view and
 delete clips: only do that on a network you trust.
 
+## The self-hosted stack
+
+Three local processes, no third-party accounts.
+
+| Part | What runs it |
+|---|---|
+| Database | Postgres on 127.0.0.1:5432, database `arete` |
+| Object storage | MinIO on 127.0.0.1:9000, bucket `clips` |
+| App | `Arete.bat` |
+
+Start the first two before the app:
+
+```
+net start postgresql-x64-18        (needs an admin shell)
+scripts\start-storage.bat          (leave it open)
+```
+
+The app checks both on launch and tells you which one is down rather than
+opening onto an empty library.
+
+First-time storage setup, safe to re-run:
+
+```bash
+python -m tools.setup_storage
+```
+
+That creates the bucket and allows anonymous `GetObject` on its contents, which
+is what lets someone open a share link with no credentials. Listing is not
+granted, so keys cannot be enumerated, and every key carries an unguessable
+clip id.
+
+### Moving an existing library onto it
+
+```bash
+python -m tools.migrate_data --source sqlite:///./recording.db --files ./clips_local
+```
+
+Copies users, clips and renditions into whatever `DATABASE_URL` points at, then
+uploads the files into whatever `STORAGE_BACKEND` points at. Re-runnable: rows
+already present are skipped, files already stored at the right size are not
+re-uploaded, so an interrupted run just gets run again.
+
+### Why S3 rather than a folder
+
+The same backend talks to a local MinIO, a MinIO on a server, Cloudflare R2 or
+S3 itself, because presigned PUT and public GET are the only operations used.
+That is what makes self-hosting now and moving to a server later the same code
+path instead of two, and it is why nothing here is tied to this desktop.
+
 ## Going from prototype to real
 
 Both swaps are configuration, not code.
