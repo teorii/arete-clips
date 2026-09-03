@@ -180,6 +180,42 @@ accuracy would mean re-encoding the partial group of pictures at each edge.
 Trimming replaces the clip. That is the point: the 25 seconds of walking back
 to lane stop existing.
 
+## Running it on a second machine
+
+Every client carries an API key. It decides whose library a clip lands in, and
+without one the API answers 401 to everything except share pages.
+
+On the host, issue a key per person:
+
+```bash
+python -m tools.add_user --handle seth --adopt-existing
+python -m tools.add_user --handle james
+```
+
+`--adopt-existing` takes ownership of clips captured before keys existed, so an
+upgrade does not orphan a library. The key is printed once; only its SHA-256 is
+stored, so it cannot be recovered, only reissued. `--revoke <handle>` disables
+one without touching that person's clips.
+
+Each machine puts its own key in `.env`:
+
+```
+ARETE_API_KEY=arete_...
+API_BASE_URL=https://wherever-the-host-is
+```
+
+The second machine needs no server of its own. Pointing `API_BASE_URL` at the
+host is enough: the app notices it is not the host, skips starting uvicorn, and
+opens its window against the shared API. Mode is derived rather than being a
+flag someone forgets to set.
+
+What stays public, deliberately: `/c/<slug>` and the clip files themselves. A
+share link that needed a key would not be a share link. Everything else, the
+library listing included, needs one.
+
+Libraries are separate. Acting on someone else's clip returns 404 rather than
+403, since a 403 would confirm the clip exists.
+
 ## Sharing beyond this machine
 
 Links resolve to `localhost` by default, which means they only work here. For

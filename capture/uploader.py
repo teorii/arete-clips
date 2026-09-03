@@ -40,8 +40,15 @@ class UploadError(RuntimeError):
 
 
 class Uploader:
-    def __init__(self, api_base_url: str, journal_path: Path, timeout: float = 60.0):
+    def __init__(
+        self,
+        api_base_url: str,
+        journal_path: Path,
+        timeout: float = 60.0,
+        api_key: str = "",
+    ):
         self.api = api_base_url.rstrip("/")
+        self.api_key = api_key
         self.journal_path = Path(journal_path)
         self.journal_path.parent.mkdir(parents=True, exist_ok=True)
         self.timeout = timeout
@@ -190,16 +197,24 @@ class Uploader:
 
     # ------------------------------------------------------------- plumbing
 
+    def _auth_headers(self) -> dict[str, str]:
+        return {"X-API-Key": self.api_key} if self.api_key else {}
+
     def _post_json(self, client: httpx.Client, url: str, body: dict) -> dict:
         last: Exception | None = None
         for attempt in range(4):
             try:
-                response = client.post(url, json=body)
+                response = client.post(url, json=body, headers=self._auth_headers())
                 if response.status_code < 500:
                     response.raise_for_status()
                     return response.json()
                 last = UploadError(f"{response.status_code} {response.text[:200]}")
             except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 401:
+                    raise UploadError(
+                        "rejected: check ARETE_API_KEY, or issue one with "
+                        "python -m tools.add_user --handle <name>"
+                    ) from exc
                 raise UploadError(
                     f"{url} -> {exc.response.status_code} {exc.response.text[:200]}"
                 ) from exc

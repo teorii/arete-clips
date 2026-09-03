@@ -71,7 +71,9 @@ class Daemon:
     def __init__(self) -> None:
         self.s = get_capture_settings()
         self.ring = RingBuffer(self.s)
-        self.uploader = Uploader(self.s.api_base_url, JOURNAL)
+        self.uploader = Uploader(
+            self.s.api_base_url, JOURNAL, api_key=self.s.arete_api_key
+        )
         self.gpu = gpu_name()
         self._busy = threading.Lock()
 

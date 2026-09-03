@@ -66,6 +66,26 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class User(Base):
+    """Someone running a capture client.
+
+    Identity is an API key rather than an account: a handful of known people do
+    not need signup, passwords or account recovery, and every one of those is a
+    thing that can go wrong. Only the hash is stored, so a leaked database does
+    not hand over working keys.
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[Uuid] = mapped_column(Uuid, primary_key=True, default=uuid7)
+    handle: Mapped[str] = mapped_column(String(64), unique=True)
+    api_key_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, server_default=func.now()
+    )
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Clip(Base):
     __tablename__ = "clips"
 

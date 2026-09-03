@@ -35,6 +35,8 @@ if sys.stdout is None or sys.stderr is None:
     sys.stdout = sys.stdout or _log
     sys.stderr = sys.stderr or _log
 
+from urllib.parse import quote, urlparse  # noqa: E402
+
 import httpx  # noqa: E402
 import uvicorn  # noqa: E402
 import webview  # noqa: E402
@@ -55,7 +57,33 @@ PORT = int(os.environ.get("PORT", "8000"))
 # address and not somewhere anything can navigate to.
 UI_HOST = "127.0.0.1" if HOST in {"0.0.0.0", "::"} else HOST
 DIST = ROOT / "frontend" / "dist"
-APP_URL = f"http://{UI_HOST}:{PORT}/app/"
+
+
+def _capture_config():
+    from capture.config import get_capture_settings
+
+    return get_capture_settings()
+
+
+_CAPTURE = _capture_config()
+API_BASE = _CAPTURE.api_base_url.rstrip("/")
+
+# Whether this machine hosts the API or just talks to one.
+#
+# A second person running this points API_BASE_URL at the host and should not
+# start a server of their own: their clips belong in the shared database, not a
+# private copy of it. Deriving the mode from where the API lives keeps that from
+# being a flag someone forgets to set.
+IS_HOST = urlparse(API_BASE).hostname in {"localhost", "127.0.0.1", "::1", None}
+
+# The key rides in the fragment, which is never sent to the server, so it stays
+# out of access logs while still reaching the page before its first request.
+_KEY_FRAGMENT = f"#k={quote(_CAPTURE.arete_api_key)}" if _CAPTURE.arete_api_key else ""
+APP_URL = (
+    f"http://{UI_HOST}:{PORT}/app/{_KEY_FRAGMENT}"
+    if IS_HOST
+    else f"{API_BASE}/app/{_KEY_FRAGMENT}"
+)
 ICON_PATH = ROOT / "assets" / "arete.ico"
 
 
@@ -311,25 +339,43 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if not DIST.is_dir():
-        print("frontend/dist is missing. Build it first:  cd frontend && npm run build")
-        return 1
-
-    if port_is_taken(UI_HOST, PORT):
-        print(
-            f"Port {PORT} is already in use. Another {APP_NAME} or a uvicorn "
-            "started from a terminal is probably still running."
-        )
-        return 1
-
     # Before any window exists, or the taskbar button is already Python's.
     claim_taskbar_identity()
 
-    api = ApiServer(verbose=args.verbose)
-    api.start()
-    if not wait_for_health():
-        print(f"The API did not come up on port {PORT}. See {LOG_PATH}.")
-        return 1
+    api: ApiServer | None = None
+
+    if IS_HOST:
+        if not DIST.is_dir():
+            print("frontend/dist is missing. Build it:  cd frontend && npm run build")
+            return 1
+        if port_is_taken(UI_HOST, PORT):
+            print(
+                f"Port {PORT} is already in use. Another {APP_NAME} or a uvicorn "
+                "started from a terminal is probably still running."
+            )
+            return 1
+        api = ApiServer(verbose=args.verbose)
+        api.start()
+        if not wait_for_health():
+            print(f"The API did not come up on port {PORT}. See {LOG_PATH}.")
+            return 1
+    else:
+        # Client mode: someone else hosts the API and the database, so this
+        # machine starts no server of its own. Both checks fail loudly here
+        # rather than opening a window onto an unreachable host, where the
+        # symptom would be an empty library with no explanation.
+        print(f"Using the API at {API_BASE}")
+        if not _CAPTURE.arete_api_key:
+            print(
+                "No ARETE_API_KEY set. Ask whoever runs the host "
+                "to issue one: python -m tools.add_user --handle <name>"
+            )
+            return 1
+        try:
+            httpx.get(f"{API_BASE}/healthz", timeout=8.0).raise_for_status()
+        except httpx.HTTPError as exc:
+            print(f"Cannot reach {API_BASE}: {exc}")
+            return 1
 
     tray: Tray | None = None
     # Set once the tray Quit item runs, so the closing handler stops hiding the
@@ -430,7 +476,8 @@ def main() -> int:
         if tray is not None:
             tray.stop()
         capture.stop()
-        api.stop()
+        if api is not None:
+            api.stop()
     return 0
 
 

@@ -19,19 +19,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import inspect, or_, select, text, tuple_
+from sqlalchemy import or_, select, tuple_
 from sqlalchemy.orm import Session
 
+from .auth import require_user
 from .config import get_settings
-from .db import engine, get_db
+from .db import get_db
 from .ids import public_slug, uuid7
+from .migrate import ensure_schema
 from .models import (
-    Base,
     Clip,
     ClipRendition,
     ClipStatus,
     RenditionStatus,
     TriggerType,
+    User,
     Visibility,
 )
 from .media import MediaError, duration_seconds, poster, trim
@@ -53,17 +55,16 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    Base.metadata.create_all(engine)
-    _ensure_columns()
+    ensure_schema()
     yield
 
 
 app = FastAPI(title="Clip Service", version="0.1.0", lifespan=lifespan)
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
-# Single-user prototype. Auth is deliberately out of scope for the first cut;
-# every clip is owned by this id so the library query is still exercised.
-DEV_OWNER_ID = UUID("00000000-0000-7000-8000-000000000001")
+# The owner of any clip captured before keys existed. Kept as a real user so
+# an upgrade does not orphan an existing library.
+LEGACY_OWNER_ID = UUID("00000000-0000-7000-8000-000000000001")
 
 _CONTENT_TYPES = {"source": "video/mp4", "thumb": "image/jpeg"}
 
@@ -79,33 +80,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-def _ensure_columns() -> None:
-    """Add columns introduced after a database was already created.
-
-    Alembic is the right answer once this has users. While the schema is
-    still moving, adding a missing column beats telling someone to delete
-    their clip library.
-    """
-    inspector = inspect(engine)
-    if not inspector.has_table("clips"):
-        return
-    existing = {c["name"] for c in inspector.get_columns("clips")}
-    if "favorite" not in existing:
-        default = "0" if engine.dialect.name == "sqlite" else "false"
-        with engine.begin() as conn:
-            conn.execute(
-                text(
-                    "alter table clips add column favorite "
-                    f"boolean not null default {default}"
-                )
-            )
-    if "version" not in existing:
-        with engine.begin() as conn:
-            conn.execute(
-                text("alter table clips add column version integer not null default 1")
-            )
 
 
 def _storage_key(clip_id: UUID, captured: datetime, label: str) -> str:
@@ -173,7 +147,11 @@ def _clip_out(clip: Clip) -> ClipOut:
 
 
 @app.post("/api/clips", response_model=ClipCreateOut, response_model_by_alias=True)
-def create_clip(payload: ClipCreate, db: Session = Depends(get_db)) -> ClipCreateOut:
+def create_clip(
+    payload: ClipCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user),
+) -> ClipCreateOut:
     """Reserve a clip row and hand back somewhere to put the bytes."""
     clip_id = uuid7()
     now = datetime.now(timezone.utc)
@@ -194,7 +172,7 @@ def create_clip(payload: ClipCreate, db: Session = Depends(get_db)) -> ClipCreat
     clip = Clip(
         id=clip_id,
         public_slug=public_slug(),
-        owner_id=DEV_OWNER_ID,
+        owner_id=user.id,
         title=payload.title,
         game_id=payload.game_id,
         status=ClipStatus.pending_upload,
@@ -245,11 +223,16 @@ def create_clip(payload: ClipCreate, db: Session = Depends(get_db)) -> ClipCreat
     response_model_by_alias=True,
 )
 def complete_clip(
-    clip_id: UUID, payload: ClipComplete, db: Session = Depends(get_db)
+    clip_id: UUID,
+    payload: ClipComplete,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> ClipOut:
     """Confirm the bytes landed. Verified against storage, not trusted."""
     clip = db.get(Clip, clip_id)
-    if clip is None or clip.deleted_at is not None:
+    if clip is None or clip.deleted_at is not None or clip.owner_id != user.id:
+        # Not 403: telling someone their key is valid but the clip is not
+        # theirs confirms the clip exists.
         raise HTTPException(404, "clip not found")
 
     storage = get_storage()
@@ -293,6 +276,7 @@ def list_clips(
     favorite: bool | None = None,
     status: str | None = None,
     db: Session = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> ClipPage:
     """Keyset pagination, never OFFSET.
 
@@ -301,7 +285,7 @@ def list_clips(
     """
     stmt = (
         select(Clip)
-        .where(Clip.owner_id == DEV_OWNER_ID, Clip.deleted_at.is_(None))
+        .where(Clip.owner_id == user.id, Clip.deleted_at.is_(None))
         .order_by(Clip.captured_at.desc(), Clip.id.desc())
         .limit(limit + 1)
     )
@@ -343,7 +327,10 @@ def list_clips(
     "/api/clips/{clip_id}", response_model=ClipOut, response_model_by_alias=True
 )
 def patch_clip(
-    clip_id: UUID, payload: ClipPatch, db: Session = Depends(get_db)
+    clip_id: UUID,
+    payload: ClipPatch,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> ClipOut:
     """Rename, pin, or change visibility.
 
@@ -351,7 +338,9 @@ def patch_clip(
     accidentally reset visibility to the schema default.
     """
     clip = db.get(Clip, clip_id)
-    if clip is None or clip.deleted_at is not None:
+    if clip is None or clip.deleted_at is not None or clip.owner_id != user.id:
+        # Not 403: telling someone their key is valid but the clip is not
+        # theirs confirms the clip exists.
         raise HTTPException(404, "clip not found")
 
     changes = payload.model_dump(exclude_unset=True)
@@ -377,7 +366,10 @@ def patch_clip(
     "/api/clips/{clip_id}/trim", response_model=ClipOut, response_model_by_alias=True
 )
 def trim_clip(
-    clip_id: UUID, payload: ClipTrim, db: Session = Depends(get_db)
+    clip_id: UUID,
+    payload: ClipTrim,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user),
 ) -> ClipOut:
     """Shorten a clip in place.
 
@@ -385,7 +377,9 @@ def trim_clip(
     walking back to lane stop existing, rather than being kept alongside.
     """
     clip = db.get(Clip, clip_id)
-    if clip is None or clip.deleted_at is not None:
+    if clip is None or clip.deleted_at is not None or clip.owner_id != user.id:
+        # Not 403: telling someone their key is valid but the clip is not
+        # theirs confirms the clip exists.
         raise HTTPException(404, "clip not found")
     if payload.end_ms <= payload.start_ms:
         raise HTTPException(422, "end must be after start")
@@ -437,9 +431,15 @@ def trim_clip(
 
 
 @app.delete("/api/clips/{clip_id}", status_code=204)
-def delete_clip(clip_id: UUID, db: Session = Depends(get_db)) -> Response:
+def delete_clip(
+    clip_id: UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user),
+) -> Response:
     clip = db.get(Clip, clip_id)
-    if clip is None or clip.deleted_at is not None:
+    if clip is None or clip.deleted_at is not None or clip.owner_id != user.id:
+        # Not 403: telling someone their key is valid but the clip is not
+        # theirs confirms the clip exists.
         raise HTTPException(404, "clip not found")
     storage = get_storage()
     for rendition in clip.renditions:

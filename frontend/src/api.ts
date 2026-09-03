@@ -52,10 +52,53 @@ export class ApiError extends Error {
   }
 }
 
+const KEY_STORAGE = 'arete.api-key'
+
+/**
+ * Take an API key out of the URL fragment and remember it.
+ *
+ * The desktop app opens the window at `/app/#k=<key>`. A fragment is never sent
+ * to the server, so the key stays out of access logs and referrers, and reading
+ * it before the first render avoids racing the app's opening request. Call this
+ * once, before rendering.
+ */
+export function adoptKeyFromUrl(): void {
+  const match = /[#&]k=([^&]+)/.exec(window.location.hash)
+  if (!match) return
+  try {
+    localStorage.setItem(KEY_STORAGE, decodeURIComponent(match[1]))
+  } catch {
+    /* storage blocked; the key still works for this page load below */
+  }
+  // Strip it so it is not sitting in the address bar to be copied by accident.
+  history.replaceState(null, '', window.location.pathname + window.location.search)
+}
+
+export function apiKey(): string {
+  try {
+    return localStorage.getItem(KEY_STORAGE) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+export function setApiKey(key: string): void {
+  try {
+    localStorage.setItem(KEY_STORAGE, key.trim())
+  } catch {
+    /* nothing useful to do */
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const key = apiKey()
   const response = await fetch(path, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(key ? { 'X-API-Key': key } : {}),
+      ...(init?.headers ?? {}),
+    },
   })
   if (!response.ok) {
     const body = await response.text().catch(() => '')

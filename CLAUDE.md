@@ -43,6 +43,19 @@ recording; `--no-tray` makes closing the window quit. The pieces below still run
 
 Requires ffmpeg on PATH (or installed via winget) and an NVENC-capable GPU.
 
+## Identity
+
+Every client carries an API key (`X-API-Key`), issued by `tools/add_user.py`.
+Only the hash is stored. `owner_id` on a clip comes from the key, and the
+library query filters by it, so libraries are separate by default.
+
+Public on purpose: `/c/<slug>`, the rendition files, `/healthz`. Everything
+else needs a key. Acting on another user's clip returns 404, not 403, because
+403 confirms the clip exists.
+
+`desktop.py` decides whether to host the API from whether `API_BASE_URL` is
+local. A second machine points it at the host and starts no server of its own.
+
 ## Invariants worth protecting
 
 These are load-bearing. Changing one is a design decision, not a refactor.

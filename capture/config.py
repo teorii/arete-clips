@@ -9,6 +9,8 @@ class CaptureSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     api_base_url: str = "http://localhost:8000"
+    # Issued by tools/add_user.py. Identifies which library a clip belongs to.
+    arete_api_key: str = ""
 
     ring_buffer_dir: Path = Path("./ringbuf")
     clip_seconds: int = 30

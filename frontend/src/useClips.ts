@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { type Clip, listClips } from './api'
+import { ApiError, type Clip, listClips } from './api'
 
 export type Filter = 'all' | 'pinned'
 
@@ -36,7 +36,14 @@ export function useClips(search: string, filter: Filter) {
         setError(null)
       } catch (err) {
         if (id !== requestId.current) return
-        setError(err instanceof Error ? err.message : 'Could not reach the clip service')
+        if (err instanceof ApiError && err.status === 401) {
+          setError(
+            'No valid API key. Issue one with: python -m tools.add_user --handle <name>, ' +
+              'then put it in .env as ARETE_API_KEY and restart.',
+          )
+        } else {
+          setError(err instanceof Error ? err.message : 'Could not reach the clip service')
+        }
       } finally {
         if (id === requestId.current) setLoading(false)
       }
