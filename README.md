@@ -86,9 +86,37 @@ Find the display you play on, then set `DDAGRAB_OUTPUT_IDX` in `.env`:
 .venv\Scripts\python -m capture.daemon --probe
 ```
 
-## Run
+## Run it as an app
 
-Two terminals.
+Double-click **`Clipper.bat`**. That opens a native window with the API and the
+capture daemon running inside the same process, so there is nothing to start in
+a terminal and no URL to type.
+
+- **F9** clips the last 30 seconds from anywhere, including inside a game.
+- **Closing the window does not stop recording.** It hides to the tray, because
+  a recorder that quits when you close its window is no use mid-game. Quit for
+  real from the tray menu.
+- The **tray icon** doubles as a status light: red means the ring buffer is
+  running, grey means capture could not start and only the library works.
+  Right-click it to clip, reopen, or quit. Windows 11 files new tray icons
+  under the `^` overflow, so drag it onto the taskbar to keep it visible.
+- `Clipper (debug).bat` is the same thing with a console attached, which is
+  where you watch clip timings and the share link appear.
+- Logs land in `clipper.log` when launched without a console.
+
+The window is WebView2, the browser engine already built into Windows 11, so
+there is no second runtime to install and nothing bundled.
+
+```bash
+python desktop.py                 # window plus capture
+python desktop.py --no-capture    # window only, for UI work
+python desktop.py --verbose       # log every HTTP request, open devtools
+python desktop.py --no-tray       # no tray; closing the window quits
+```
+
+## Run the pieces separately
+
+Useful for development. Two terminals.
 
 ```bash
 .venv\Scripts\python -m uvicorn server.main:app --port 8000

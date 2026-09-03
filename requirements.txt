@@ -12,3 +12,11 @@ psycopg[binary]==3.2.10
 
 # Cloudflare R2 / any S3-compatible object storage.
 boto3==1.40.30
+
+# Desktop shell. Renders through the WebView2 runtime built into Windows,
+# so there is no bundled browser.
+pywebview==6.2.1
+
+# Tray icon, so closing the window keeps the recorder running.
+pystray==0.19.5
+pillow==12.1.0

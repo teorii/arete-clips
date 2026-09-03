@@ -6,10 +6,16 @@ on the player's GPU; the backend only ever moves metadata.
 Personal project. The design authority is `docs/design/medal-question.html`:
 when a structural question comes up, check there before inventing an answer.
 
-## Three processes
+## Running it
+
+The shipped form is the desktop app: `Clipper.bat`, or `python desktop.py`.
+That runs the API, the capture daemon and a WebView2 window in one process.
+`desktop.py --verbose` adds access logs and devtools; `--no-capture` skips
+recording; `--no-tray` makes closing the window quit. The pieces below still run standalone for development.
 
 | Part | Command | Notes |
 |---|---|---|
+| Desktop app | `python desktop.py` | API + capture + window, one process |
 | API + share pages | `.venv\Scripts\python -m uvicorn server.main:app --port 8000` | Also serves the built SPA at `/app` |
 | Capture daemon | `.venv\Scripts\python -m capture.daemon` | `--test` clips once and exits; `--probe` lists displays |
 | Frontend (dev) | `cd frontend && npm run dev` | Port 5173, proxies `/api` to 8000 |
@@ -76,10 +82,15 @@ Both are env vars in `.env`, not code changes:
 - **Postgres**: run `sql/001_init.sql` against Supabase, set `DATABASE_URL=postgresql+psycopg://...`
 - **Object storage**: set `STORAGE_BACKEND=r2` plus the four `R2_*` values
 
+## Tests
+
+`.venv\Scripts\python -m pytest` runs 34 tests covering the clip
+lifecycle, upload-signature enforcement and ring buffer segment selection.
+Capture itself is not covered: it needs a GPU and a live display.
+
 ## Known gaps
 
-- **No tests.** This is application code and should have them. Start with
-  `clipper.flush` segment selection and the `complete_clip` verification path.
+- **Not packaged.** Runs from the venv. PyInstaller would make it a single .exe.
 - Video-only: no audio capture yet.
 - Upload retry is per-clip via the journal, not byte-range resumable.
 - One hardcoded `DEV_OWNER_ID`; no auth.
